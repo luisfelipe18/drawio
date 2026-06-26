@@ -5,6 +5,7 @@ Format = function(editorUi, container)
 {
 	this.editorUi = editorUi;
 	this.container = container;
+	this.collapsedSections = editorUi.getCollapsedSections();
 };
 
 /**
@@ -187,7 +188,10 @@ Format.prototype.immediateRefresh = function()
 	{
 		return;
 	}
-	
+
+	// Snapshots the focused input so it can be restored after the
+	// rebuild (eg. while tabbing through inputs, see issue #5368)
+	var focusState = this.captureFocus();
 	this.clear();
 	var ui = this.editorUi;
 	var graph = ui.editor.graph;
@@ -199,7 +203,11 @@ Format.prototype.immediateRefresh = function()
 	this.container.appendChild(div);
 	
 	var ss = ui.getSelectionState();
-	var containsLabel = ss.containsLabel;
+	// transparentBounds cells store 0x0 geometry (their bounds are derived from
+	// the children), which flags the selection as a label. For tab selection
+	// they behave like regular cells, so they keep the current tab (e.g. Arrange)
+	// instead of switching to the separate label tab memory (defaults to Style).
+	var containsLabel = ss.containsLabel && !ss.transparentBounds;
 	var currentLabel = null;
 	var currentPanel = null;
 	
@@ -363,6 +371,93 @@ Format.prototype.immediateRefresh = function()
 	}
 	
 	div.className = 'geFormatTitleContainer';
+
+	// Restores focus and selection on the rebuilt input
+	this.restoreFocus(focusState);
+};
+
+/**
+ * Records the currently focused format input so it can be restored
+ * after the panel DOM is rebuilt in immediateRefresh. The input is
+ * identified by its index among the focusable controls in the panel
+ * (the rebuild is deterministic for a given selection, so the order
+ * is stable). Returns null if focus is not on a panel input, in which
+ * case restoreFocus is a no-op (eg. focus is in the canvas).
+ */
+Format.prototype.captureFocus = function()
+{
+	var active = document.activeElement;
+
+	if (active == null || !this.container.contains(active) ||
+		(active.nodeName != 'INPUT' && active.nodeName != 'SELECT' &&
+		active.nodeName != 'TEXTAREA'))
+	{
+		return null;
+	}
+
+	var focusables = this.container.querySelectorAll('input, select, textarea');
+	var index = Array.prototype.indexOf.call(focusables, active);
+
+	if (index < 0)
+	{
+		return null;
+	}
+
+	var state = {index: index, nodeName: active.nodeName, type: active.type};
+
+	// Caret/selection is only available on text inputs (number, select,
+	// color throw on access, so this is guarded)
+	try
+	{
+		state.selectionStart = active.selectionStart;
+		state.selectionEnd = active.selectionEnd;
+		state.selectionDirection = active.selectionDirection;
+	}
+	catch (e)
+	{
+		// ignore
+	}
+
+	return state;
+};
+
+/**
+ * Restores focus and selection captured by captureFocus on the rebuilt
+ * panel. Skips if the control at the recorded index no longer matches
+ * (eg. a conditional field changed the layout) or is not visible.
+ */
+Format.prototype.restoreFocus = function(state)
+{
+	if (state == null)
+	{
+		return;
+	}
+
+	var focusables = this.container.querySelectorAll('input, select, textarea');
+	var el = focusables[state.index];
+
+	if (el == null || el.nodeName != state.nodeName || el.type != state.type ||
+		el.offsetParent == null)
+	{
+		return;
+	}
+
+	el.focus({preventScroll: true});
+
+	if (state.selectionStart != null)
+	{
+		try
+		{
+			el.setSelectionRange(
+				Math.min(state.selectionStart, el.value.length),
+				Math.min(state.selectionEnd, el.value.length),
+				state.selectionDirection);
+		}
+		catch (e)
+		{
+			// ignore
+		}
+	}
 };
 
 /**
@@ -542,7 +637,68 @@ BaseFormatPanel.prototype.createTitle = function(title)
 };
 
 /**
- * 
+ * Creates a collapsible section with a toggle chevron.
+ * Returns {wrapper, contentDiv} where contentDiv is the
+ * container for section content.
+ */
+BaseFormatPanel.prototype.createCollapsibleSection = function(title, defaultCollapsed)
+{
+	var state = this.format.collapsedSections;
+
+	// Use stored state if available, otherwise use default
+	var collapsed = (state[title] != null) ? state[title] : defaultCollapsed;
+
+	var wrapper = document.createElement('div');
+	wrapper.className = 'geFormatSection';
+
+	var titleDiv = document.createElement('div');
+	titleDiv.className = 'geCollapsibleTitle' + (collapsed ? '' : ' geExpanded');
+	titleDiv.setAttribute('title', title);
+	mxUtils.write(titleDiv, title);
+	wrapper.appendChild(titleDiv);
+
+	var contentDiv = document.createElement('div');
+	contentDiv.className = 'geCollapsibleContent' + (collapsed ? ' geCollapsed' : '');
+	wrapper.appendChild(contentDiv);
+
+	var ui = this.format.editorUi;
+
+	mxEvent.addListener(titleDiv, 'click', function()
+	{
+		titleDiv.classList.toggle('geExpanded');
+		contentDiv.classList.toggle('geCollapsed');
+		state[title] = !titleDiv.classList.contains('geExpanded');
+		ui.fireEvent(new mxEventObject('collapsedSectionsChanged'));
+	});
+
+	return {wrapper: wrapper, contentDiv: contentDiv};
+};
+
+/**
+ * Hides the collapsible wrapper if inner panel is hidden (display none)
+ * or has no visible children. Also observes style changes to keep in sync.
+ */
+BaseFormatPanel.prototype.syncCollapsibleVisibility = function(wrapper, innerPanel)
+{
+	var update = function()
+	{
+		wrapper.style.display = (innerPanel.style.display == 'none') ? 'none' : '';
+	};
+
+	// Initial check
+	update();
+
+	// Observe attribute changes on inner panel for dynamic display toggling
+	if (typeof MutationObserver !== 'undefined')
+	{
+		var observer = new MutationObserver(update);
+		observer.observe(innerPanel, {attributes: true, attributeFilter: ['style']});
+		this.listeners.push({destroy: function() { observer.disconnect(); }});
+	}
+};
+
+/**
+ *
  */
 BaseFormatPanel.prototype.addAction = function(div, name)
 {
@@ -875,7 +1031,7 @@ BaseFormatPanel.prototype.createCellOption = function(label, key, defaultValue, 
  * Adds the given color option.
  */
 BaseFormatPanel.prototype.createColorOption = function(label, getColorFn, setColorFn, defaultColor,
-	listener, callbackFn, hideCheckbox, defaultColorValue, singleColorMode, isDarkModeFn)
+	listener, callbackFn, hideCheckbox, defaultColorValue, singleColorMode, isDarkModeFn, title)
 {
 	var darkModeOverridden = isDarkModeFn != null;
 	isDarkModeFn = (isDarkModeFn != null) ? isDarkModeFn : Editor.isDarkMode;
@@ -930,7 +1086,7 @@ BaseFormatPanel.prototype.createColorOption = function(label, getColorFn, setCol
 	};
 
 	// Adds native color dialog
-	if (!mxClient.IS_IE && !mxClient.IS_IE11 && !mxClient.IS_TOUCH)
+	if (!mxClient.IS_TOUCH)
 	{
 		dropper = document.createElement('img');
 		dropper.src = Editor.colorDropperImage;
@@ -1099,7 +1255,10 @@ BaseFormatPanel.prototype.createColorOption = function(label, getColorFn, setCol
 		{
 			apply(newColor);
 		}, (defaultColor == 'default') ? 'default' : null,
-			actualDefaultValue, singleColorMode);
+			actualDefaultValue, singleColorMode, title || label, function()
+		{
+			return getActualColorValue(getColorFn(), true);
+		});
 
 		mxEvent.consume(evt);
 	}));
@@ -1252,7 +1411,7 @@ BaseFormatPanel.prototype.createArrayCellColorOption = function(label, colorKey,
  * 
  */
 BaseFormatPanel.prototype.createCellColorOption = function(label, colorKey, defaultColor,
-	callbackFn, setStyleFn, defaultColorValue, undefinedValue, allowArrays)
+	callbackFn, setStyleFn, defaultColorValue, undefinedValue, allowArrays, title)
 {
 	var ui = this.editorUi;
 	var editor = ui.editor;
@@ -1329,7 +1488,7 @@ BaseFormatPanel.prototype.createCellColorOption = function(label, colorKey, defa
 			{
 				graph.getModel().removeListener(this.listener);
 			}
-		}, callbackFn, null, defaultColorValue);
+		}, callbackFn, null, defaultColorValue, null, null, title);
 	}
 };
 
@@ -1592,31 +1751,78 @@ ArrangePanel.prototype.init = function()
 	if (ss.cells.length > 0)
 	{
 		this.container.appendChild(this.addLayerOps(this.createPanel()));
-		
+
 		// Special case that adds two panels
-		this.addGeometry(this.container);
-		this.addEdgeGeometry(this.container);
-	
+		var geoSec = this.createCollapsibleSection(mxResources.get('size') +
+			' / ' + mxResources.get('position'), false);
+		this.addGeometry(geoSec.contentDiv);
+
+		if (geoSec.contentDiv.childNodes.length > 0)
+		{
+			this.container.appendChild(geoSec.wrapper);
+		}
+
+		if (ss.edges.length > 0 && (ss.style.shape == 'link' || ss.style.shape == 'flexArrow'))
+		{
+			var arrowSec = this.createCollapsibleSection(mxResources.get('arrow'), false);
+			this.addArrowGeometry(arrowSec.contentDiv);
+			this.container.appendChild(arrowSec.wrapper);
+		}
+
+		if (ss.edges.length == 1)
+		{
+			var edge = ss.edges[0];
+			var graph = this.editorUi.editor.graph;
+			var title = '';
+
+			if (graph.model.getTerminal(edge, true) == null)
+			{
+				title = mxResources.get('linestart');
+			}
+
+			if (graph.model.getTerminal(edge, false) == null)
+			{
+				title += ((title.length > 0) ? ' / ' : '') +
+					mxResources.get('lineend');
+			}
+
+			if (title.length > 0)
+			{
+				var edgeGeoSec = this.createCollapsibleSection(title, false);
+				edgeGeoSec.contentDiv.style.paddingBottom = '10px';
+				this.addEdgeGeometry(edgeGeoSec.contentDiv);
+				this.container.appendChild(edgeGeoSec.wrapper);
+			}
+		}
+
 		if (!ss.containsLabel || ss.edges.length == 0)
 		{
-			this.container.appendChild(this.addAngle(this.createPanel()));
+			var angleSec = this.createCollapsibleSection(mxResources.get('rotation'), true);
+			angleSec.contentDiv.appendChild(this.addAngle(this.createPanel()));
+			this.container.appendChild(angleSec.wrapper);
 		}
-		
+
 		if (!ss.containsLabel)
 		{
-			this.container.appendChild(this.addFlip(this.createPanel()));
+			var flipSec = this.createCollapsibleSection(mxResources.get('flip'), true);
+			flipSec.contentDiv.appendChild(this.addFlip(this.createPanel()));
+			this.container.appendChild(flipSec.wrapper);
 		}
 
 		this.container.appendChild(this.addAlign(this.createPanel()));
-		
+
 		if (ss.vertices.length > 1 && !ss.cell && !ss.row)
 		{
 			this.container.appendChild(this.addDistribute(this.createPanel()));
 		}
 
-		this.container.appendChild(this.addTable(this.createPanel()));
+		var tablePanel = this.addTable(this.createPanel());
+		var tableSec = this.createCollapsibleSection(mxResources.get('table'), true);
+		tableSec.contentDiv.appendChild(tablePanel);
+		this.container.appendChild(tableSec.wrapper);
+		this.syncCollapsibleVisibility(tableSec.wrapper, tablePanel);
 	}
-	
+
 	// Allows to lock/unload button to be added
 	this.container.appendChild(this.addGroupOps(this.createPanel()));
 };
@@ -1629,9 +1835,7 @@ ArrangePanel.prototype.addTable = function(div)
 	var ui = this.editorUi;
 	var editor = ui.editor;
 	var graph = editor.graph;
-	var ss = ui.getSelectionState();	
-	div.appendChild(this.createTitle(mxResources.get('table')));
-
+	var ss = ui.getSelectionState();
 	var panel = document.createElement('div');
 	panel.style.position = 'relative';
 	panel.style.paddingLeft = '0px';
@@ -1657,6 +1861,21 @@ ArrangePanel.prototype.addTable = function(div)
 	var isTable = ss.table || ss.row || ss.cell;
 	var isStack = graph.isStack(cell) ||
 		graph.isStackChild(cell);
+
+	var tableForCheck = cell;
+
+	if (tableForCheck != null && graph.isTableCell(tableForCheck))
+	{
+		tableForCheck = graph.model.getParent(tableForCheck);
+	}
+
+	if (tableForCheck != null && graph.isTableRow(tableForCheck))
+	{
+		tableForCheck = graph.model.getParent(tableForCheck);
+	}
+
+	var emptyTable = !isStack && tableForCheck != null &&
+		graph.model.getChildCount(tableForCheck) === 0;
 
 	var showCols = isTable;
 	var showRows = isTable;
@@ -1732,6 +1951,12 @@ ArrangePanel.prototype.addTable = function(div)
 					ui.handleError(e);
 				}
 			}), panel)]);
+
+		if (emptyTable)
+		{
+			btns[btns.length - 3].setAttribute('disabled', 'disabled');
+			btns[btns.length - 2].setAttribute('disabled', 'disabled');
+		}
 	}
 
 	if (showRows)
@@ -1966,12 +2191,6 @@ ArrangePanel.prototype.addFlip = function(div)
 	var graph = editor.graph;
 	var ss = this.editorUi.getSelectionState();
 
-	var span = document.createElement('div');
-	span.className = 'geFormatSectionTitle';
-	mxUtils.write(span, mxResources.get('flip'));
-	span.setAttribute('title', mxResources.get('flip'));
-	div.appendChild(span);
-	
 	var btn = mxUtils.button(mxResources.get('horizontal'), function(evt)
 	{
 		graph.flipCells(ss.cells, true);
@@ -2113,6 +2332,22 @@ ArrangePanel.prototype.addAngle = function(div)
 		{
 			btn.style.marginTop = '10px';
 		}
+
+		// Adds a separate rotate-by-90 button for fully unconnected edges (issue #5076)
+		if (ss.vertices.length == 0 && ss.edges.length > 0 && !ss.connectedEdges)
+		{
+			mxUtils.br(div);
+
+			var rotateBtn = mxUtils.button(mxResources.get('turn'), function(evt)
+			{
+				ui.actions.get('rotateEdge').funct(evt);
+			});
+
+			rotateBtn.setAttribute('title', mxResources.get('turn'));
+			rotateBtn.className = 'geFullWidthElement';
+			rotateBtn.style.marginTop = '2px';
+			div.appendChild(rotateBtn);
+		}
 	}
 	
 	if (input != null)
@@ -2227,6 +2462,25 @@ ArrangePanel.prototype.addGeometry = function(container)
 	var graph = ui.editor.graph;
 	var model = graph.getModel();
 	var rect = ui.getSelectionState();
+
+	// transparentBounds cells store their geometry pinned at (0,0,0,0) and derive
+	// their visible box from their children, so position and size are shown
+	// read-only using the derived bounds rather than the stored geometry.
+	var transparent = rect.vertices.length == 1 && rect.edges.length == 0 &&
+		graph.isTransparentBounds(rect.vertices[0]);
+
+	// Visible bounds of the selected transparentBounds cell in parent coordinates
+	// (matching the position/size convention of the editable inputs).
+	var getTransparentRect = function()
+	{
+		var cell = rect.vertices[0];
+		var local = graph.getTransparentBounds(cell);
+		var cellGeo = graph.getCellGeometry(cell);
+
+		return (local != null && cellGeo != null) ? new mxRectangle(
+			cellGeo.x + local.x, cellGeo.y + local.y,
+			local.width, local.height) : null;
+	};
 
 	var div = this.createPanel();
 	div.style.height = '60px';
@@ -2352,14 +2606,18 @@ ArrangePanel.prototype.addGeometry = function(container)
 		}
 	});
 	
-	if (rect.resizable || rect.row || rect.cell)
+	if (rect.resizable || rect.row || rect.cell || transparent)
 	{
 		container.appendChild(div);
 	}
-	
+
 	var div2 = this.createPanel();
 	div2.style.paddingBottom = '30px';
-	
+
+	// Size and position read as a single block, so the divider between them
+	// (the position section's top border) is removed.
+	div2.style.borderTop = 'none';
+
 	var span = document.createElement('div');
 	span.style.position = 'absolute';
 	span.style.width = '70px';
@@ -2379,7 +2637,33 @@ ArrangePanel.prototype.addGeometry = function(container)
 	}, this.getUnitStep(), null, null, this.isFloatUnit());
 
 	mxUtils.br(div2);
-	
+
+	// Position and size are derived from the children for transparentBounds cells,
+	// so the inputs are read-only and the steppers, autosize and constrain
+	// proportions options are hidden. The replacement "border" input (groupPadding)
+	// is added below the position inputs, just above the automatic checkbox.
+	if (transparent)
+	{
+		var roInputs = [width, height, left, top];
+
+		for (var i = 0; i < roInputs.length; i++)
+		{
+			roInputs[i].setAttribute('readonly', 'readonly');
+			mxUtils.setOpacity(roInputs[i], 60);
+
+			if (roInputs[i].nextSibling != null)
+			{
+				roInputs[i].nextSibling.style.visibility = 'hidden';
+			}
+		}
+
+		autosizeBtn.style.visibility = 'hidden';
+		wrapper.style.display = 'none';
+
+		// Drops the now-empty space left by the hidden constrain-proportions row.
+		div.style.height = '42px';
+	}
+
 	var coordinateLabels = true;
 	var dx = null;
 	var dy = null;
@@ -2482,6 +2766,23 @@ ArrangePanel.prototype.addGeometry = function(container)
 	var listener = mxUtils.bind(this, function(sender, evt, force)
 	{
 		rect = ui.getSelectionState();
+
+		if (transparent)
+		{
+			var tb = getTransparentRect();
+
+			if (tb != null)
+			{
+				div.style.display = '';
+				div2.style.display = '';
+				width.value = this.inUnit(tb.width) + ' ' + this.getUnit();
+				height.value = this.inUnit(tb.height) + ' ' + this.getUnit();
+				left.value = this.inUnit(tb.x) + ' ' + this.getUnit();
+				top.value = this.inUnit(tb.y) + ' ' + this.getUnit();
+
+				return;
+			}
+		}
 
 		if (!rect.containsLabel && rect.vertices.length == graph.getSelectionCount() &&
 			rect.width != null && rect.height != null)
@@ -2663,6 +2964,79 @@ ArrangePanel.prototype.addGeometry = function(container)
 		}
 		container.appendChild(div2);
 	}
+
+	// Adds the "automatic" checkbox at the bottom of the section for a single
+	// group with child cells. It toggles transparentBounds, which derives the
+	// group's position and size from its children instead of storing them, so
+	// it only applies when there are children to derive from (an empty group or
+	// swimlane would collapse to wrong bounds). The margin clears the
+	// absolutely positioned position labels above it.
+	var groupCell = (rect.vertices.length == 1 && rect.edges.length == 0) ?
+		rect.vertices[0] : null;
+
+	if (groupCell != null && model.getChildCount(groupCell) > 0)
+	{
+		div2.style.paddingBottom = '6px';
+
+		// When automatic (transparentBounds) is on, a "border width" input sets the
+		// groupPadding (the gap kept between the derived bounds and the children).
+		// It sits below the position inputs and above the automatic checkbox, with
+		// its input aligned to the right column of the size/position rows.
+		if (transparent)
+		{
+			var borderWrapper = document.createElement('div');
+			borderWrapper.style.position = 'relative';
+			borderWrapper.style.height = '24px';
+			// Clears the absolutely positioned position labels above (their
+			// marginTop 10 + height 16) and adds the same gap the position row
+			// has above it, so the spacing before the border row is consistent.
+			borderWrapper.style.marginTop = '40px';
+
+			var borderLabel = document.createElement('span');
+			borderLabel.style.position = 'absolute';
+			borderLabel.style.left = '0px';
+			borderLabel.style.lineHeight = '24px';
+			mxUtils.write(borderLabel, mxResources.get('borderWidth'));
+			borderLabel.setAttribute('title', mxResources.get('borderWidth'));
+			borderWrapper.appendChild(borderLabel);
+
+			var borderInput = document.createElement('input');
+			borderInput.setAttribute('type', 'text');
+			borderInput.style.position = 'absolute';
+			borderInput.style.left = '148px';
+			borderInput.style.width = '52px';
+			borderInput.setAttribute('title', mxResources.get('borderWidth'));
+			borderWrapper.appendChild(borderInput);
+			div2.appendChild(borderWrapper);
+
+			this.installInputHandler(borderInput, mxConstants.STYLE_GROUP_PADDING,
+				0, 0, 999, '', null, false);
+
+			var borderListener = mxUtils.bind(this, function()
+			{
+				if (document.activeElement != borderInput)
+				{
+					var value = parseInt(mxUtils.getValue(ui.getSelectionState().style,
+						mxConstants.STYLE_GROUP_PADDING, 0));
+					borderInput.value = isNaN(value) ? 0 : value;
+				}
+			});
+
+			model.addListener(mxEvent.CHANGE, borderListener);
+			this.listeners.push({destroy: function() { model.removeListener(borderListener); }});
+			this.addKeyHandler(borderInput, borderListener);
+			borderListener();
+		}
+
+		var autoWrapper = document.createElement('div');
+		autoWrapper.className = 'geFormatEntry';
+		autoWrapper.style.marginTop = transparent ? '6px' : '26px';
+		var autoOpt = this.createCellOption(mxResources.get('automatic'),
+			'transparentBounds', null, '1', 'null');
+		autoOpt.className = 'geFullWidthElement';
+		autoWrapper.appendChild(autoOpt);
+		div2.appendChild(autoWrapper);
+	}
 };
 
 /**
@@ -2677,11 +3051,20 @@ ArrangePanel.prototype.addGeometryHandler = function(input, fn)
 	
 	function update(evt)
 	{
+		// Read-only inputs (e.g. the derived position/size of a transparentBounds
+		// group) must never write back: their displayed value already includes the
+		// derived offset, so writing it into the stored geometry corrupts it. A
+		// blur fired while the panel is rebuilt would otherwise do exactly that.
+		if (input.readOnly)
+		{
+			return;
+		}
+
 		if (input.value != '')
 		{
 			var value = parseFloat(input.value);
 
-			if (isNaN(value)) 
+			if (isNaN(value))
 			{
 				input.value = initialValue + ' ' + panel.getUnit();
 			}
@@ -2804,26 +3187,28 @@ ArrangePanel.prototype.addEdgeGeometryHandler = function(input, fn)
 };
 
 /**
- * 
+ *
  */
-ArrangePanel.prototype.addEdgeGeometry = function(container)
+ArrangePanel.prototype.addArrowGeometry = function(container)
 {
-	var panel = this;
 	var ui = this.editorUi;
 	var graph = ui.editor.graph;
 	var rect = ui.getSelectionState();
 	var div = this.createPanel();
-	
+	div.style.display = 'flex';
+	div.style.alignItems = 'center';
+
 	var span = document.createElement('div');
 	span.style.position = 'absolute';
 	span.style.width = '70px';
 	span.style.marginTop = '0px';
 	span.style.fontWeight = 'bold';
+
 	mxUtils.write(span, mxResources.get('width'));
 	span.setAttribute('title', mxResources.get('width'));
 	div.appendChild(span);
 
-	var widthUpdate, xtUpdate, ytUpdate, xsUpdate, ysUpdate;
+	var widthUpdate;
 	var width = this.addUnitInput(div, 'pt', 12, 44, function()
 	{
 		widthUpdate.apply(this, arguments);
@@ -2831,14 +3216,14 @@ ArrangePanel.prototype.addEdgeGeometry = function(container)
 	width.setAttribute('title', mxResources.get('width'));
 
 	mxUtils.br(div);
-	this.addKeyHandler(width, listener);
-	
-	var widthUpdate = mxUtils.bind(this, function(evt)
+	container.appendChild(div);
+
+	widthUpdate = mxUtils.bind(this, function(evt)
 	{
 		// Maximum stroke width is 999
 		var value = parseInt(width.value);
 		value = Math.min(999, Math.max(1, (isNaN(value)) ? 1 : value));
-		
+
 		if (value != mxUtils.getValue(rect.style, 'width', mxCellRenderer.defaultShapes['flexArrow'].prototype.defaultWidth))
 		{
 			var cells = ui.getSelectionState().cells;
@@ -2854,10 +3239,38 @@ ArrangePanel.prototype.addEdgeGeometry = function(container)
 	mxEvent.addListener(width, 'blur', widthUpdate);
 	mxEvent.addListener(width, 'change', widthUpdate);
 
-	container.appendChild(div);
+	var listener = mxUtils.bind(this, function(sender, evt, force)
+	{
+		rect = ui.getSelectionState();
 
+		if (force || document.activeElement != width)
+		{
+			var value = mxUtils.getValue(rect.style, 'width',
+				mxCellRenderer.defaultShapes['flexArrow'].prototype.defaultWidth);
+			width.value = value + ' pt';
+		}
+	});
+
+	this.addKeyHandler(width, listener);
+	graph.getModel().addListener(mxEvent.CHANGE, listener);
+	this.listeners.push({destroy: function() { graph.getModel().removeListener(listener); }});
+	listener();
+};
+
+/**
+ *
+ */
+ArrangePanel.prototype.addEdgeGeometry = function(container)
+{
+	var panel = this;
+	var ui = this.editorUi;
+	var graph = ui.editor.graph;
+	var rect = ui.getSelectionState();
+	var xtUpdate, ytUpdate, xsUpdate, ysUpdate;
+
+	container.style.paddingBottom = '22px';
 	var divs = this.createPanel();
-	divs.style.paddingBottom = '30px';
+	divs.style.paddingBottom = '16px';
 
 	var span = document.createElement('div');
 	span.style.position = 'absolute';
@@ -2878,15 +3291,12 @@ ArrangePanel.prototype.addEdgeGeometry = function(container)
 	}, this.getUnitStep(), null, null, this.isFloatUnit());
 	ys.setAttribute('title', mxResources.get('top'));
 
-	mxUtils.br(divs);
-	this.addLabel(divs, mxResources.get('left'), 87, 64);
-	this.addLabel(divs, mxResources.get('top'), 16, 64);
 	container.appendChild(divs);
-	this.addKeyHandler(xs, listener);
-	this.addKeyHandler(ys, listener);
 
 	var divt = this.createPanel();
-	divt.style.paddingBottom = '30px';
+	divt.style.borderTop = 'none';
+	divt.style.paddingTop = '8px';
+	divt.style.paddingBottom = '16px';
 
 	var span = document.createElement('div');
 	span.style.position = 'absolute';
@@ -2907,38 +3317,20 @@ ArrangePanel.prototype.addEdgeGeometry = function(container)
 	}, this.getUnitStep(), null, null, this.isFloatUnit());
 	yt.setAttribute('title', mxResources.get('top'));
 
-	mxUtils.br(divt);
-	this.addLabel(divt, mxResources.get('left'), 87, 64);
-	this.addLabel(divt, mxResources.get('top'), 16, 64);
 	container.appendChild(divt);
-	this.addKeyHandler(xt, listener);
-	this.addKeyHandler(yt, listener);
+
+	this.addLabel(container, mxResources.get('left'), 87, 62).style.fontSize = '10px';
+	this.addLabel(container, mxResources.get('top'), 16, 62).style.fontSize = '10px';
 
 	var listener = mxUtils.bind(this, function(sender, evt, force)
 	{
 		rect = ui.getSelectionState();
 		var cell = rect.cells[0];
-		
-		if (rect.style.shape == 'link' || rect.style.shape == 'flexArrow')
-		{
-			div.style.display = '';
-			
-			if (force || document.activeElement != width)
-			{
-				var value = mxUtils.getValue(rect.style, 'width',
-					mxCellRenderer.defaultShapes['flexArrow'].prototype.defaultWidth);
-				width.value = value + ' pt';
-			}
-		}
-		else
-		{
-			div.style.display = 'none';
-		}
 
 		if (rect.cells.length == 1 && graph.model.isEdge(cell))
 		{
 			var geo = graph.model.getGeometry(cell);
-			
+
 			if (geo != null && geo.sourcePoint != null &&
 				graph.model.getTerminal(cell, true) == null)
 			{
@@ -2949,7 +3341,7 @@ ArrangePanel.prototype.addEdgeGeometry = function(container)
 			{
 				divs.style.display = 'none';
 			}
-			
+
 			if (geo != null && geo.targetPoint != null &&
 				graph.model.getTerminal(cell, false) == null)
 			{
@@ -2967,6 +3359,11 @@ ArrangePanel.prototype.addEdgeGeometry = function(container)
 			divt.style.display = 'none';
 		}
 	});
+
+	this.addKeyHandler(xs, listener);
+	this.addKeyHandler(ys, listener);
+	this.addKeyHandler(xt, listener);
+	this.addKeyHandler(yt, listener);
 
 	xsUpdate = this.addEdgeGeometryHandler(xs, function(geo, value)
 	{
@@ -3031,13 +3428,34 @@ TextFormatPanel.prototype.init = function()
  */
 TextFormatPanel.prototype.addFontOps = function(div)
 {
+	var copyBtn = this.addAction(div, 'copyTextStyle');
+	var pasteBtn = this.addAction(div, 'pasteTextStyle');
+
+	if (copyBtn != null && pasteBtn != null)
+	{
+		copyBtn.style.marginRight = '4px';
+		copyBtn.style.width = '104px';
+		pasteBtn.style.width = '104px';
+
+		// Remove br between copy and paste
+		if (copyBtn.nextSibling != null && copyBtn.nextSibling.nodeName == 'BR')
+		{
+			copyBtn.nextSibling.parentNode.removeChild(copyBtn.nextSibling);
+		}
+	}
+
+	if (copyBtn != null || pasteBtn != null)
+	{
+		mxUtils.br(div);
+	}
+
 	var count = this.addActions(div, ['removeFormat']);
 
-	if (count == 0)
+	if (count == 0 && copyBtn == null && pasteBtn == null)
 	{
 		div.style.display = 'none';
 	}
-	
+
 	return div;
 };
 
@@ -3573,6 +3991,14 @@ TextFormatPanel.prototype.addFont = function(container)
 	
 	panel.style.fontWeight = 'bold';
 	colorPanel.appendChild(panel);
+	// Hide label background/border options for curvedText shapes
+	// (SVG textPath does not support label backgrounds)
+	if (ss.style[mxConstants.STYLE_SHAPE] == 'curvedText')
+	{
+		bgPanel.style.display = 'none';
+		borderPanel.style.display = 'none';
+	}
+
 	colorPanel.appendChild(bgPanel);
 	
 	var textShadow = this.createCellOption(mxResources.get('shadow'),
@@ -3585,7 +4011,7 @@ TextFormatPanel.prototype.addFont = function(container)
 		textShadow.getElementsByTagName('input')[0].setAttribute('disabled', 'disabled');
 		mxUtils.setOpacity(textShadow, 60);
 	}
-	
+
 	if (!graph.cellEditor.isContentEditing())
 	{
 		colorPanel.appendChild(borderPanel);
@@ -3601,47 +4027,137 @@ TextFormatPanel.prototype.addFont = function(container)
 	var wwCells = graph.filterSelectionCells(mxUtils.bind(this, function(cell)
 	{
 		var state = graph.view.getState(cell);
-		
+
 		return state == null ||
 			graph.getModel().isEdge(cell) ||
 			graph.isAutoSizeState(state);
 	}));
-	
-	var wwOpt = this.createCellOption(mxResources.get('wordWrap'), mxConstants.STYLE_WHITE_SPACE,
+
+	var state = graph.view.getState(graph.getSelectionCell());
+	var formatted = mxUtils.getValue(ss.style, 'html', 0) == '1';
+
+	// Uses svgWhiteSpace when convertToSvg is active, whiteSpace otherwise
+	// (vertical text always uses foreignObject, see mxUtils.convertHtmlToSvg)
+	var isSvgMode = formatted && !mxUtils.isVerticalTextDirection(ss.style[mxConstants.STYLE_TEXT_DIRECTION]) &&
+		((graph.getSelectionCount() > 1 && ss.style['convertToSvg'] == '1') ||
+		(graph.getSelectionCount() == 1 && state != null && state.text != null &&
+		state.text.node != null && state.text.node.getElementsByTagName('foreignObject').length == 0));
+
+	var wwStyleKey = isSvgMode ? 'svgWhiteSpace' : mxConstants.STYLE_WHITE_SPACE;
+	var wwOpt = this.createCellOption(mxResources.get('wordWrap'), wwStyleKey,
 		null, 'wrap', 'null', null, null, true, wwCells);
 	wwOpt.style.fontWeight = 'bold';
-	
+
 	// Word wrap in edge labels only supported via labelWidth style
 	if (wwCells.length > 0)
 	{
 		extraPanel.appendChild(wwOpt);
 	}
-	
+
 	// Delegates switch of style to formattedText action as it also convertes newlines
 	var htmlOpt = this.createCellOption(mxResources.get('formattedText'), 'html', 0,
 		null, null, null, ui.actions.get('formattedText'));
 	htmlOpt.style.fontWeight = 'bold';
 	extraPanel.appendChild(htmlOpt);
 
-	var state = graph.view.getState(graph.getSelectionCell());
-	var formatted = mxUtils.getValue(ss.style, 'html', 0) == '1';
-	
-	if (formatted && ((graph.getSelectionCount() > 1 && ss.style['convertToSvg'] == '1') ||
-		(graph.getSelectionCount() == 1 && state != null && state.text != null &&
-		state.text.node != null && state.text.node.getElementsByTagName('foreignObject').length == 0)))
+	var convertToSvg = this.createCellOption(mxResources.get('lblToSvg'), 'convertToSvg', '0',
+		null, null, function(cells, value)
 	{
-		wwOpt.style.opacity = '0.5';
-		wwOpt.getElementsByTagName('input')[0].setAttribute('disabled', 'disabled');
-	}
+		// Syncs word wrap style when toggling convertToSvg
+		for (var i = 0; i < cells.length; i++)
+		{
+			var cellStyle = graph.getCurrentCellStyle(cells[i]);
 
-	var convertToSvg = this.createCellOption(mxResources.get('lblToSvg'), 'convertToSvg', '0');
+			if (value)
+			{
+				// Toggled ON: copy whiteSpace to svgWhiteSpace
+				if (cellStyle[mxConstants.STYLE_WHITE_SPACE] == 'wrap')
+				{
+					graph.setCellStyles('svgWhiteSpace', 'wrap', [cells[i]]);
+				}
+			}
+			else
+			{
+				// Toggled OFF: copy svgWhiteSpace to whiteSpace
+				if (cellStyle['svgWhiteSpace'] == 'wrap')
+				{
+					graph.setCellStyles(mxConstants.STYLE_WHITE_SPACE, 'wrap', [cells[i]]);
+				}
+			}
+		}
+	});
 	convertToSvg.style.fontWeight = 'bold';
 	extraPanel.appendChild(convertToSvg);
 	
+	var convertInput = convertToSvg.getElementsByTagName('input')[0];
+
 	if (!formatted)
 	{
-		convertToSvg.style.opacity = '0.5';
-		convertToSvg.getElementsByTagName('input')[0].setAttribute('disabled', 'disabled');
+		// Keeps a checked option enabled so that it can be unchecked
+		if (!convertInput.checked)
+		{
+			convertToSvg.style.opacity = '0.5';
+			convertInput.setAttribute('disabled', 'disabled');
+		}
+	}
+	else
+	{
+		// Disables option if the conversion is not possible for any selected
+		// cell's label, using a dry-run of the same code that the renderer
+		// uses for the actual conversion (see mxUtils.canConvertHtmlToSvg)
+		var hasUnsupported = false;
+		var cells = graph.getSelectionCells();
+
+		for (var i = 0; i < cells.length && !hasUnsupported; i++)
+		{
+			var cellState = graph.view.getState(cells[i]);
+			var label = (cellState != null) ? graph.cellRenderer.getLabelValue(cellState) : null;
+
+			// Escapes plain-text labels before they are parsed as HTML below.
+			// getLabelValue only sanitizes HTML labels (html=1 or whiteSpace=wrap)
+			// and returns the raw value for plain-text cells, so an editable=0
+			// plain-text sibling can smuggle a raw label into canConvertHtmlToSvg
+			// (which assigns it to innerHTML). See the same guard used for label
+			// measurement in Graph.updateCellSize and mxText.updateValue.
+			if (label != null && label.length > 0 && !graph.isHtmlLabel(cells[i]))
+			{
+				label = mxUtils.htmlEntities(label, false);
+			}
+
+			if (label != null && label.length > 0 && !mxUtils.canConvertHtmlToSvg(label, {
+				dir: cellState.style[mxConstants.STYLE_TEXT_DIRECTION],
+				fontSize: mxUtils.getValue(cellState.style, mxConstants.STYLE_FONTSIZE,
+					mxConstants.DEFAULT_FONTSIZE)}))
+			{
+				hasUnsupported = true;
+			}
+		}
+
+		if (hasUnsupported)
+		{
+			// Keeps a checked option enabled so that it can be unchecked
+			if (!convertInput.checked)
+			{
+				convertToSvg.style.opacity = '0.5';
+				convertInput.setAttribute('disabled', 'disabled');
+				convertToSvg.setAttribute('title',
+					'Label contains unsupported HTML or vertical text for SVG conversion. ' +
+					'Supported: H1-H6, P, PRE, BLOCKQUOTE, DIV, B, I, U, STRIKE, ' +
+					'SUP, SUB, SPAN, FONT, BR (without background color).');
+			}
+			else
+			{
+				// Visible warning as tooltips are not available on touch devices
+				var warning = document.createElement('span');
+				warning.style.marginLeft = '4px';
+				warning.style.cursor = 'default';
+				mxUtils.write(warning, '⚠︎');
+				convertToSvg.appendChild(warning);
+				convertToSvg.setAttribute('title',
+					'Label cannot be converted to SVG and falls back to HTML rendering. ' +
+					'Uncheck to remove the style.');
+			}
+		}
 	}
 
 	var autosizeOpt = this.createCellOption(mxResources.get('autosizeText'),
@@ -3675,15 +4191,6 @@ TextFormatPanel.prototype.addFont = function(container)
 
 	var spacingPanel = this.createPanel();
 	spacingPanel.style.height = '86px';
-	
-	var span = document.createElement('div');
-	span.style.position = 'absolute';
-	span.style.width = '70px';
-	span.style.marginTop = '0px';
-	span.style.fontWeight = 'bold';
-	mxUtils.write(span, mxResources.get('spacing'));
-	span.setAttribute('title', mxResources.get('spacing'));
-	spacingPanel.appendChild(span);
 
 	var topUpdate, globalUpdate, leftUpdate, bottomUpdate, rightUpdate;
 	var topSpacing = this.addUnitInput(spacingPanel, this.getUnit(), 87, 52, function()
@@ -3727,8 +4234,15 @@ TextFormatPanel.prototype.addFont = function(container)
 	if (!graph.cellEditor.isContentEditing())
 	{
 		container.appendChild(extraPanel);
-		container.appendChild(this.createRelativeOption(mxResources.get('opacity'), mxConstants.STYLE_TEXT_OPACITY));
-		container.appendChild(spacingPanel);
+		var opacityPanel = this.createRelativeOption(mxResources.get('opacity'), mxConstants.STYLE_TEXT_OPACITY);
+		opacityPanel.style.borderTopStyle = 'solid';
+		opacityPanel.style.borderTopWidth = '1px';
+		opacityPanel.style.padding = '6px 0';
+		container.appendChild(opacityPanel);
+
+		var spacingSec = this.createCollapsibleSection(mxResources.get('spacing'), true);
+		spacingSec.contentDiv.appendChild(spacingPanel);
+		container.appendChild(spacingSec.wrapper);
 	}
 	else
 	{
@@ -3773,7 +4287,10 @@ TextFormatPanel.prototype.addFont = function(container)
 					}
 				}
 
-				if (node != null)
+				// Only changes the line height if the selection is inside the cell
+				// editor (eg. ignores a Ctrl+A selection outside the canvas)
+				if (graph.cellEditor.textarea != null &&
+					graph.cellEditor.textarea.contains(node))
 				{
 					if (node != graph.cellEditor.textarea)
 					{
@@ -3957,25 +4474,28 @@ TextFormatPanel.prototype.addFont = function(container)
 				ui.pickColor(color, function(newColor)
 				{
 					var targetElt = (tableCell != null && (evt == null || !mxEvent.isShiftDown(evt))) ? tableCell : currentTable;
-					
-					graph.processElements(targetElt, function(elt)
+
+					if (targetElt != null)
 					{
-						elt.style.border = null;
-					});
-					
-					if (newColor == null || newColor == mxConstants.NONE)
-					{
-						targetElt.removeAttribute('border');
-						targetElt.style.border = '';
-						targetElt.style.borderCollapse = '';
+						graph.processElements(targetElt, function(elt)
+						{
+							elt.style.border = null;
+						});
+
+						if (newColor == null || newColor == mxConstants.NONE)
+						{
+							targetElt.removeAttribute('border');
+							targetElt.style.border = '';
+							targetElt.style.borderCollapse = '';
+						}
+						else
+						{
+							targetElt.setAttribute('border', '1');
+							targetElt.style.border = '1px solid ' + newColor;
+							targetElt.style.borderCollapse = 'collapse';
+						}
 					}
-					else
-					{
-						targetElt.setAttribute('border', '1');
-						targetElt.style.border = '1px solid ' + newColor;
-						targetElt.style.borderCollapse = 'collapse';
-					}
-				});
+				}, null, null, null, mxResources.get('borderColor'));
 			}
 		}), tablePanel2),
 		ui.addButton(Editor.fillColorImage, mxResources.get('backgroundColor'),
@@ -3992,21 +4512,24 @@ TextFormatPanel.prototype.addFont = function(container)
 				ui.pickColor(color, function(newColor)
 				{
 					var targetElt = (tableCell != null && (evt == null || !mxEvent.isShiftDown(evt))) ? tableCell : currentTable;
-					
-					graph.processElements(targetElt, function(elt)
+
+					if (targetElt != null)
 					{
-						elt.style.backgroundColor = null;
-					});
-					
-					if (newColor == null || newColor == mxConstants.NONE)
-					{
-						targetElt.style.backgroundColor = '';
+						graph.processElements(targetElt, function(elt)
+						{
+							elt.style.backgroundColor = null;
+						});
+
+						if (newColor == null || newColor == mxConstants.NONE)
+						{
+							targetElt.style.backgroundColor = '';
+						}
+						else
+						{
+							targetElt.style.backgroundColor = newColor;
+						}
 					}
-					else
-					{
-						targetElt.style.backgroundColor = newColor;
-					}
-				});
+				}, null, null, null, mxResources.get('backgroundColor'));
 			}
 		}), tablePanel2),
 		ui.addButton(Editor.spacingImage, mxResources.get('spacing'),
@@ -4564,22 +5087,38 @@ StyleFormatPanel.prototype.init = function()
 
 		if (ss.fill)
 		{
-			this.container.appendChild(this.addFill(this.createPanel()));
+			var fillSec = this.createCollapsibleSection(mxResources.get('fill'), false);
+			fillSec.contentDiv.appendChild(this.addFill(this.createPanel()));
+			this.container.appendChild(fillSec.wrapper);
 		}
-	
-		this.container.appendChild(this.addStroke(this.createPanel()));
-		this.container.appendChild(this.addLineJumps(this.createPanel()));
+
+		var strokeSec = this.createCollapsibleSection(mxResources.get('line'), false);
+		strokeSec.contentDiv.appendChild(this.addStroke(this.createPanel()));
+		this.container.appendChild(strokeSec.wrapper);
+
+		var lineJumpsPanel = this.addLineJumps(this.createPanel());
+		var jumpsSec = this.createCollapsibleSection(mxResources.get('lineJumps'), true);
+		jumpsSec.contentDiv.appendChild(lineJumpsPanel);
+		this.container.appendChild(jumpsSec.wrapper);
+		this.syncCollapsibleVisibility(jumpsSec.wrapper, lineJumpsPanel);
+
 		var opacityPanel = this.createRelativeOption(mxResources.get('opacity'), mxConstants.STYLE_OPACITY);
+		opacityPanel.style.borderTopStyle = 'solid';
+		opacityPanel.style.borderTopWidth = '1px';
+		opacityPanel.style.padding = '6px 0';
 		this.container.appendChild(opacityPanel);
-		this.container.appendChild(this.addEffects(this.createPanel()));
+
+		var effectsSec = this.createCollapsibleSection(mxResources.get('effects'), true);
+		effectsSec.contentDiv.appendChild(this.addEffects(this.createPanel()));
+		this.container.appendChild(effectsSec.wrapper);
 	}
 
 	var opsPanel = this.createPanel();
-	
+
 	if (ss.cells.length == 1)
 	{
 		this.addEditOps(opsPanel);
-		
+
 		if (opsPanel.firstChild != null)
 		{
 			mxUtils.br(opsPanel);
@@ -4776,8 +5315,8 @@ StyleFormatPanel.prototype.addEditOps = function(div)
 		editSelect.className = 'geFullWidthElement';
 		
 		var ops = ['edit', 'copyAsText', 'editLink', 'editShape', 'editImage',
-			'editData', 'copyData', 'pasteData', 'editConnectionPoints',
-			'editGeometry', 'editPolygon', 'editTooltip', 'editStyle'];
+			'editData', 'copyData', 'pasteData',
+			'editConnectionPoints', 'editGeometry', 'editPolygon', 'editTooltip', 'editStyle'];
 		var libs = null;
 
 		if (this.editorUi.sidebar != null)
@@ -4934,18 +5473,22 @@ StyleFormatPanel.prototype.addFill = function(container)
 	{
 		graph.updateCellStyles({'gradientColor': color}, graph.getSelectionCells());
 	}, graph.getDefaultColor(ss.style, mxConstants.STYLE_GRADIENTCOLOR,
-		graph.shapeForegroundColor, graph.shapeBackgroundColor));
+		graph.shapeForegroundColor, graph.shapeBackgroundColor),
+		null, null, mxResources.get('gradientColor'));
 	
 	gradientPanel.style.fontWeight = 'bold';
 
 	var fillKey = (ss.style.shape == 'image') ? mxConstants.STYLE_IMAGE_BACKGROUND : mxConstants.STYLE_FILLCOLOR;
 
+	// createCellColorOption already calls setCellStyles internally with the
+	// current selection. Passing setStyleFn that called setCellStyles again
+	// with the closure-captured ss.cells caused color changes to leak onto
+	// the cells the format panel was originally built for, when the user's
+	// selection had moved on between panel build and color change.
 	var fillPanel = this.createCellColorOption(mxResources.get('fill'),
-		fillKey, 'default', null, mxUtils.bind(this, function(color)
-	{
-		graph.setCellStyles(fillKey, color, ss.cells);
-	}), graph.getDefaultColor(ss.style, fillKey, graph.shapeBackgroundColor,
-		graph.shapeForegroundColor));
+		fillKey, 'default', null, null,
+		graph.getDefaultColor(ss.style, fillKey, graph.shapeBackgroundColor,
+		graph.shapeForegroundColor), null, null, mxResources.get('fillColor'));
 
 	fillPanel.style.fontWeight = 'bold';
 	var tmpColor = mxUtils.getValue(ss.style, fillKey, null);
@@ -5288,22 +5831,26 @@ StyleFormatPanel.prototype.addStroke = function(container)
 
 	var strokeKey = (ss.style.shape == 'image') ? mxConstants.STYLE_IMAGE_BORDER : mxConstants.STYLE_STROKECOLOR;
 	var label = (ss.style.shape == 'image') ? mxResources.get('border') : mxResources.get('line');
+	var strokeTitle = (ss.style.shape == 'image') ? mxResources.get('borderColor') : mxResources.get('strokeColor');
 
 	var lineColor = this.createCellColorOption(label, strokeKey, 'default', null, mxUtils.bind(this, function(color)
 	{
-		graph.setCellStyles(strokeKey, color, ss.cells);
-
-		// Sets strokeColor to inherit for rows and cells in tables
+		// createCellColorOption already applied the color to the current
+		// selection via setCellStyles. Avoid a second setCellStyles call
+		// against the stale ss.cells closure (which leaked color changes
+		// onto cells the user no longer had selected). The table-cell
+		// inherit-fix below intentionally uses the fresh selection.
 		if (color == null || color == mxConstants.NONE)
 		{
+			var freshCells = ui.getSelectionState().cells;
 			var tableCells = [];
 
-			for (var i = 0; i < ss.cells.length; i++)
+			for (var i = 0; i < freshCells.length; i++)
 			{
-				if (graph.isTableCell(ss.cells[i]) ||
-					graph.isTableRow(ss.cells[i]))
+				if (graph.isTableCell(freshCells[i]) ||
+					graph.isTableRow(freshCells[i]))
 				{
-					tableCells.push(ss.cells[i]);
+					tableCells.push(freshCells[i]);
 				}
 			}
 
@@ -5312,7 +5859,7 @@ StyleFormatPanel.prototype.addStroke = function(container)
 				graph.setCellStyles(strokeKey, 'inherit', tableCells);
 			}
 		}
-	}), graph.shapeForegroundColor);
+	}), graph.shapeForegroundColor, null, null, strokeTitle);
 	
 	lineColor.style.fontWeight = 'bold';
 	lineColor.appendChild(styleSelect);
@@ -5783,6 +6330,7 @@ StyleFormatPanel.prototype.addStroke = function(container)
 	arrowPanel.style.display = 'block';
 	arrowPanel.style.height = '60px';
 	arrowPanel.style.paddingTop = '2px';
+	arrowPanel.style.paddingBottom = '10px';
 	arrowPanel.style.overflow = 'visible';
 	
 	var span = document.createElement('div');
@@ -5814,7 +6362,7 @@ StyleFormatPanel.prototype.addStroke = function(container)
 	mxUtils.br(arrowPanel);
 	
 	var spacer = document.createElement('div');
-	spacer.style.height = '8px';
+	spacer.style.height = '12px';
 	arrowPanel.appendChild(spacer);
 	
 	var spacingLabel = span.cloneNode(false);
@@ -5835,7 +6383,9 @@ StyleFormatPanel.prototype.addStroke = function(container)
 	}, this.getUnitStep(), null, null, this.isFloatUnit());
 	endSpacing.setAttribute('title', mxResources.get('lineend'));
 
-	mxUtils.br(arrowPanel);
+	var spacer = document.createElement('div');
+	spacer.style.height = '20px';
+	arrowPanel.appendChild(spacer);
 	this.addLabel(arrowPanel, mxResources.get('linestart'), 82, 62).style.fontSize = '10px';
 	this.addLabel(arrowPanel, mxResources.get('lineend'), 16, 62).style.fontSize = '10px';
 	mxUtils.br(arrowPanel);
@@ -6329,29 +6879,43 @@ DiagramStylePanel.prototype.getGlobalStyleButtons = function()
 		}
 	});
 
-	var buttons = [sketchDiv, mxUtils.button(mxResources.get('rounded'),
-		mxUtils.bind(this, function(evt)
+	var isAllRounded = function()
+	{
+		var cells = graph.getVerticesAndEdges();
+		var rounded = cells.length > 0;
+
+		for (var i = 0; i < cells.length; i++)
 		{
-			// Checks if all cells are rounded
-			var cells = graph.getVerticesAndEdges();
-			var rounded = true;
+			var style = graph.getCellStyle(cells[i]);
 
-			if (cells.length > 0)
+			if (mxUtils.getValue(style, mxConstants.STYLE_ROUNDED, 0) == 0)
 			{
-				for (var i = 0; i < cells.length; i++)
-				{
-					var style = graph.getCellStyle(cells[i]);
-
-					if (mxUtils.getValue(style, mxConstants.STYLE_ROUNDED, 0) == 0)
-					{
-						rounded = false;
-						break;
-					}
-				}
+				rounded = false;
+				break;
 			}
-			
-			rounded = !rounded;
-			graph.updateCellStyles({'rounded': (rounded) ? '1' : '0'}, cells);
+		}
+
+		return rounded;
+	};
+
+	var roundedDiv = document.createElement('div');
+	roundedDiv.className = 'geFormatEntry';
+
+	var roundedInput = document.createElement('input');
+	roundedInput.setAttribute('type', 'checkbox');
+	roundedInput.setAttribute('title', mxResources.get('rounded'));
+	roundedInput.checked = isAllRounded();
+	roundedDiv.appendChild(roundedInput);
+	mxUtils.write(roundedDiv, mxResources.get('rounded'));
+	roundedDiv.setAttribute('title', mxResources.get('rounded'));
+
+	mxEvent.addListener(roundedDiv, 'click', function(evt)
+	{
+		if (graph.isEnabled())
+		{
+			var rounded = !isAllRounded();
+			graph.updateCellStyles({'rounded': (rounded) ? '1' : '0'},
+				graph.getVerticesAndEdges());
 
 			if (rounded)
 			{
@@ -6366,7 +6930,9 @@ DiagramStylePanel.prototype.getGlobalStyleButtons = function()
 
 			mxEvent.consume(evt);
 		}
-	))];
+	});
+
+	var buttons = [roundedDiv, sketchDiv];
 
 	if (!graph.isEnabled())
 	{
@@ -6402,33 +6968,46 @@ DiagramStylePanel.prototype.addView = function(div)
 	
 	var opts = document.createElement('div');
 	opts.className = 'geFormatEntry';
-	
-	// Adaptive Colors
+
 	if (graph.isEnabled())
 	{
-		var table = document.createElement('table');
-		table.style.tableLayout = 'fixed';
-		table.style.width = '204px';
-		
-		var tbody = document.createElement('tbody');
-		var row = document.createElement('tr');
-		var left = document.createElement('td');
-		var right = left.cloneNode(true);
+		var row = document.createElement('div');
+		row.style.display = 'flex';
+		row.style.alignItems = 'center';
+		row.style.justifyContent = 'center';
+		row.style.gap = '8px';
+		row.style.width = '204px';
 
-		var label = document.createElement('div');
-		label.style.display = 'inline-block';
-		label.style.boxSizing = 'border-box';
-		label.style.overflow = 'hidden';
-		label.style.textOverflow = 'ellipsis';
+		var buttons = this.getGlobalStyleButtons();
 
-		var title = mxResources.get('adaptiveColors');
-		left.setAttribute('title', title);
-		mxUtils.write(label, title);
-		left.appendChild(label);
+		// Natural-width slots clustered in the center; shrink with ellipsis
+		// only when labels are too long to fit.
+		for (var i = 0; i < buttons.length; i++)
+		{
+			var btn = buttons[i];
+			btn.style.flex = '0 1 auto';
+			btn.style.minWidth = '0';
+
+			// geFormatEntry is display:flex, so wrap the trailing text node
+			// in a span so text-overflow ellipsis can apply to the label.
+			var textNode = btn.lastChild;
+
+			if (textNode != null && textNode.nodeType == 3)
+			{
+				var span = document.createElement('span');
+				span.style.overflow = 'hidden';
+				span.style.textOverflow = 'ellipsis';
+				span.style.whiteSpace = 'nowrap';
+				span.style.minWidth = '0';
+				span.appendChild(textNode);
+				btn.appendChild(span);
+			}
+
+			row.appendChild(btn);
+		}
 
 		if (mxUtils.lightDarkColorSupported)
 		{
-			label.style.width = '75%';
 			var img = document.createElement('img');
 			img.setAttribute('title', mxResources.get('light') +
 				'/' + mxResources.get('dark'));
@@ -6436,10 +7015,8 @@ DiagramStylePanel.prototype.addView = function(div)
 			img.className = 'geButton';
 			img.style.width = '18px';
 			img.style.height = '18px';
-			img.style.verticalAlign = 'bottom';
-			left.appendChild(img);
+			img.style.flex = '0 0 auto';
 
-			// Pressing label toggles dark/light mode
 			mxEvent.addListener(img, 'click', function()
 			{
 				if (graph.isEnabled())
@@ -6447,96 +7024,14 @@ DiagramStylePanel.prototype.addView = function(div)
 					ui.setDarkMode(!Editor.isDarkMode());
 				}
 			});
-		}
-		else
-		{
-			label.style.width = '100%';
+
+			row.appendChild(img);
 		}
 
-		var dropdown = document.createElement('select');
-		dropdown.style.width = '82px';
-
-		var opt = document.createElement('option');
-		opt.setAttribute('title', mxResources.get('default') + ' (' +
-			mxResources.get(Graph.getDefaultAdaptiveColorsKey()) + ')');
-		mxUtils.write(opt, mxUtils.htmlEntities(opt.getAttribute('title')));
-		opt.setAttribute('value', 'default');
-		dropdown.appendChild(opt);
-
-		var opt = document.createElement('option');
-		opt.setAttribute('title', mxResources.get('automatic'));
-		mxUtils.write(opt, mxUtils.htmlEntities(opt.getAttribute('title')));
-		opt.setAttribute('value', 'auto');
-		dropdown.appendChild(opt);
-
-		var opt = document.createElement('option');
-		opt.setAttribute('title', mxResources.get('simple'));
-		mxUtils.write(opt, mxUtils.htmlEntities(opt.getAttribute('title')));
-		opt.setAttribute('value', 'simple');
-		dropdown.appendChild(opt);
-
-		var opt = document.createElement('option');
-		opt.setAttribute('title', mxResources.get('none'));
-		mxUtils.write(opt, mxUtils.htmlEntities(opt.getAttribute('title')));
-		opt.setAttribute('value', 'none');
-		dropdown.appendChild(opt);
-
-		dropdown.value = (graph.adaptiveColors == null) ?
-			'default' : graph.adaptiveColors;
-
-		mxEvent.addListener(dropdown, 'change', function()
-		{
-			var change = new ChangePageSetup(ui);
-			change.ignoreColor = true;
-			change.ignoreImage = true;
-			change.adaptiveColors = dropdown.value;
-			
-			graph.model.execute(change);
-		});
-		
-		right.appendChild(dropdown);
-
-		if (!ui.isOffline() || mxClient.IS_CHROMEAPP || EditorUi.isElectronApp)
-		{
-			right.appendChild(ui.menus.createHelpLink(
-				'https://github.com/jgraph/drawio/discussions/4713'));
-		}
-
-		row.appendChild(left);
-		row.appendChild(right);
-		tbody.appendChild(row);
-
-		var buttons = this.getGlobalStyleButtons();
-	
-		for (var i = 0; i < buttons.length; i += 2)
-		{
-			left = left.cloneNode(false);
-			right = right.cloneNode(false);
-			row = row.cloneNode(false);
-	
-			var btn = buttons[i];
-			btn.style.width = '100%';
-	
-			left.appendChild(btn);
-			row.appendChild(left);
-	
-			btn = buttons[i + 1];
-	
-			if (btn != null)
-			{
-				btn.style.width = '100%';
-				right.appendChild(btn);
-			}
-	
-			row.appendChild(right);
-			tbody.appendChild(row);
-		}
-	
-		table.appendChild(tbody);
-		opts.appendChild(table);
+		opts.appendChild(row);
 		div.appendChild(opts);
-	
-		if (graph.isEnabled() && Editor.styles != null)
+
+		if (Editor.styles != null)
 		{
 			this.addGraphStyles(div);
 		}
@@ -7014,8 +7509,14 @@ DiagramFormatPanel.prototype.init = function()
 
 	if (graph.isEnabled())
 	{
-		this.container.appendChild(this.addOptions(this.createPanel()));
-		this.container.appendChild(this.addPaperSize(this.createPanel()));
+		var optSec = this.createCollapsibleSection(mxResources.get('options'), false);
+		optSec.contentDiv.appendChild(this.addOptions(this.createPanel()));
+		this.container.appendChild(optSec.wrapper);
+
+		var paperSec = this.createCollapsibleSection(mxResources.get('paperSize'), true);
+		paperSec.contentDiv.appendChild(this.addPaperSize(this.createPanel()));
+		this.container.appendChild(paperSec.wrapper);
+
 		this.container.appendChild(this.addStyleOps(this.createPanel()));
 	}
 };
@@ -7188,8 +7689,6 @@ DiagramFormatPanel.prototype.addOptions = function(div)
 	var editor = ui.editor;
 	var graph = editor.graph;
 	
-	div.appendChild(this.createTitle(mxResources.get('options')));	
-
 	if (graph.isEnabled())
 	{
 		// Connection arrows
@@ -7378,7 +7877,8 @@ DiagramFormatPanel.prototype.addGridOption = function(container)
 		{
 			ui.removeListener(this.listener);
 		}
-	}, null, null, defaultGridColor, true, isDarkModeFn);
+	}, null, null, defaultGridColor, true, isDarkModeFn,
+		mxResources.get('gridColor'));
 
 	panel.appendChild(input);
 	panel.appendChild(stepper);
@@ -7404,8 +7904,6 @@ DiagramFormatPanel.prototype.addPaperSize = function(div)
 	var editor = ui.editor;
 	var graph = editor.graph;
 	
-	div.appendChild(this.createTitle(mxResources.get('paperSize')));
-
 	var accessor = PageSetupDialog.addPageFormatPanel(div, 'formatpanel', graph.pageFormat, function(pageFormat)
 	{
 		if (graph.pageFormat == null || graph.pageFormat.width != pageFormat.width ||

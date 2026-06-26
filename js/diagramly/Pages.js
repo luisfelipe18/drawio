@@ -80,6 +80,61 @@ DiagramPage.prototype.setName = function(value)
 };
 
 /**
+ * Returns the stored initial view as {x, y, width, height, scale} or null.
+ * The view is persisted as a space-separated "x y width height [scale]"
+ * attribute on the diagram node (see Graph.getCurrentViewBox /
+ * EditorUi.fitInitialView). The scale is optional so externally authored or
+ * legacy four-value strings still resolve (the restore then falls back to a
+ * fit). Returns null unless at least the four geometry values are finite and
+ * width/height are positive.
+ */
+DiagramPage.prototype.getViewBox = function()
+{
+	var value = this.node.getAttribute('viewBox');
+
+	if (value != null)
+	{
+		var t = value.split(' ');
+		var x = parseFloat(t[0]);
+		var y = parseFloat(t[1]);
+		var w = parseFloat(t[2]);
+		var h = parseFloat(t[3]);
+		var s = (t.length > 4) ? parseFloat(t[4]) : null;
+
+		if (isFinite(x) && isFinite(y) && isFinite(w) && isFinite(h) && w > 0 && h > 0)
+		{
+			return {x: x, y: y, width: w, height: h,
+				scale: (s != null && isFinite(s) && s > 0) ? s : null};
+		}
+	}
+
+	return null;
+};
+
+/**
+ * Stores the given {x, y, width, height, scale} as the initial view, or
+ * removes the attribute when vb is null. The scale token is omitted when null.
+ */
+DiagramPage.prototype.setViewBox = function(vb)
+{
+	if (vb == null)
+	{
+		this.node.removeAttribute('viewBox');
+	}
+	else
+	{
+		var value = vb.x + ' ' + vb.y + ' ' + vb.width + ' ' + vb.height;
+
+		if (vb.scale != null)
+		{
+			value += ' ' + vb.scale;
+		}
+
+		this.node.setAttribute('viewBox', value);
+	}
+};
+
+/**
  * Sets the diagram modified flag.
  */
 DiagramPage.prototype.setDiagramModified = function(value)
@@ -119,6 +174,30 @@ RenamePage.prototype.execute = function()
 	// Required to update page name in placeholders
 	this.ui.editor.graph.updatePlaceholders();
 	this.ui.editor.fireEvent(new mxEventObject('pageRenamed'));
+};
+
+/**
+ * Undoable change of a page's stored initial view (see DiagramPage.getViewBox).
+ */
+function ChangePageView(ui, page, viewBox)
+{
+	this.ui = ui;
+	this.page = page;
+	this.viewBox = viewBox;
+	this.previous = viewBox;
+}
+
+/**
+ * Implementation of the undoable initial-view change.
+ */
+ChangePageView.prototype.execute = function()
+{
+	var tmp = this.page.getViewBox();
+	this.page.setViewBox(this.previous);
+	this.viewBox = this.previous;
+	this.previous = tmp;
+
+	this.ui.editor.fireEvent(new mxEventObject('pageViewChanged'));
 };
 
 /**
@@ -448,7 +527,7 @@ EditorUi.prototype.pageSelected = function()
 			}
 			else if (Editor.fitDiagramOnPage)
 			{
-				this.initialFitDiagram();
+				this.fitInitialView();
 			}
 
 			if (this.chromelessResize != null)
@@ -466,7 +545,6 @@ EditorUi.prototype.pageSelected = function()
 		}
 		
 		this.updateTabContainer();
-		this.scrollToPage();
 	}
 };
 
@@ -567,7 +645,7 @@ EditorUi.prototype.initPages = function()
 					changes[i] instanceof mxRootChange)
 				{
 					this.updateTabContainer();
-					break;	
+					break;
 				}
 			}
 
@@ -590,7 +668,7 @@ EditorUi.prototype.initPages = function()
 			if (ui.currentPage != null &&
 				lastPage != ui.currentPage)
 			{
-				lastPage = ui.currentPage;
+					lastPage = ui.currentPage;
 				ui.pageSelected();
 			}
 
@@ -617,15 +695,13 @@ EditorUi.prototype.initPages = function()
 
 		this.editor.addListener('pageSelected', mxUtils.bind(this, function(sender, evt)
 		{
-			this.scrollToPage();
-			this.updateHashObject();
 			this.updateTabContainer();
+			this.updateHashObject();
 			this.updateDocumentTitle();
 		}));
 
 		this.editor.addListener('pageMoved', mxUtils.bind(this, function(sender, evt)
 		{
-			this.scrollToPage();
 			this.updateHashObject();
 		}));
 
@@ -650,7 +726,7 @@ EditorUi.prototype.scrollToPage = function(page, force)
 		this.getSelectedPageIndex();
 	var scrollPage = (page != null) ?
 		page : this.currentPage;
-	
+
 	if (index != null && this.tabScroller != null &&
 		this.tabScroller.children.length > index &&
 		this.tabScroller.children[index] != null &&
@@ -662,6 +738,7 @@ EditorUi.prototype.scrollToPage = function(page, force)
 		this.tabScroller.children[index].className =
 			'geTab gePageTab geActivePage';
 		this.lastScrollPage = scrollPage;
+		this.btKnownTabScroll = this.tabScroller.scrollLeft;
 	}
 };
 
@@ -672,7 +749,7 @@ EditorUi.prototype.restoreViewState = function(page, viewState, selection)
 {
 	var newPage = (page != null) ? this.getPageById(page.getId()) : null;
 	var graph = this.editor.graph;
-	
+
 	if (newPage != null && this.currentPage != null && this.pages != null)
 	{
 		if (newPage != this.currentPage)
@@ -1561,7 +1638,7 @@ EditorUi.prototype.createTabContainer = function()
 {
 	var div = document.createElement('div');
 	div.className = 'geTabContainer geTabItem';
-	
+
 	return div;
 };
 
@@ -1581,76 +1658,186 @@ EditorUi.prototype.updateTabContainer = function()
 		var wrapper = document.createElement('div');
 		wrapper.className = 'geTabScroller';
 		var startIndex = null;
+		var dragTab = null;
+		var activeTab = null;
+		var ui = this;
+		var sl = (this.tabScroller != null) ? this.tabScroller.scrollLeft : 0;
+		var btCacheMiss = false;
 
 		for (var i = 0; i < this.pages.length; i++)
 		{
-			// Install drag and drop for page reorder
-			(mxUtils.bind(this, function(index, tab)
-			{
-				tab.className = 'geTab gePageTab';
+			var page = this.pages[i];
 
-				if (this.pages[index] == this.currentPage)
-				{
-					tab.classList.add('geActivePage');
-				}
-				
-				tab.setAttribute('draggable', 'true');
-				
+			if (page == null)
+			{
+				continue;
+			}
+
+			var pageId = page.getId();
+			var pageName = page.getName() || mxResources.get('untitled');
+			var cacheKey = pageId + ':' + pageName;
+			var tab = (this.btPageTabCache != null) ?
+				this.btPageTabCache[cacheKey] : null;
+
+			if (tab != null)
+			{
+				// Reuse cached tab (preserves browser translation)
+				tab.setAttribute('title', pageName + ((pageId != null) ?
+					' (' + pageId + ')' : '') + ' [' + (i + 1) + ']');
+			}
+			else
+			{
+				tab = this.createTabForPage(page, i + 1);
+				btCacheMiss = true;
+			}
+
+			// Update data-index for DnD (read at event time)
+			tab.setAttribute('draggable', 'true');
+			tab.setAttribute('data-index', i);
+			tab.className = 'geTab gePageTab';
+
+			// Install DnD listeners once per tab element
+			if (tab.btDndInstalled == null)
+			{
+				tab.btDndInstalled = true;
+
 				mxEvent.addListener(tab, 'dragstart', mxUtils.bind(this, function(evt)
 				{
 					if (graph.isEnabled())
 					{
-						// Workaround for no DnD on DIV in FF
 						if (mxClient.IS_FF)
 						{
-							// LATER: Check what triggers a parse as XML on this in FF after drop
 							evt.dataTransfer.setData('Text', '<diagram/>');
 						}
-						
-						startIndex = index;
+
+						startIndex = parseInt(
+							evt.currentTarget.getAttribute('data-index'), 10);
+						dragTab = evt.currentTarget;
+
+						// Defer hiding so browser captures the drag image first
+						window.requestAnimationFrame(function()
+						{
+							if (dragTab != null)
+							{
+								dragTab.classList.add('gePageTabDragPlaceholder');
+							}
+						});
+
+						// Suppress default drop highlight on other elements
+						ui._pageTabDragOverHandler = function(e)
+						{
+							e.dataTransfer.dropEffect = 'move';
+							e.preventDefault();
+
+							// Stop propagation for non-tab targets to
+							// suppress browser highlight on other elements
+							if (!e.target.classList ||
+								!e.target.classList.contains('gePageTab'))
+							{
+								e.stopPropagation();
+							}
+						};
+
+						ui._pageTabDropHandler = function(e)
+						{
+							e.preventDefault();
+							e.stopPropagation();
+						};
+
+						document.addEventListener('dragover',
+							ui._pageTabDragOverHandler, true);
+						document.addEventListener('drop',
+							ui._pageTabDropHandler, true);
 					}
 					else
 					{
-						// Blocks event
 						mxEvent.consume(evt);
 					}
 				}));
-				
+
 				mxEvent.addListener(tab, 'dragend', mxUtils.bind(this, function(evt)
 				{
+					if (dragTab != null)
+					{
+						dragTab.classList.remove('gePageTabDragPlaceholder');
+
+						// Determine final position from DOM order
+						var tabs = dragTab.parentNode.querySelectorAll('.gePageTab');
+						var dropIndex = 0;
+
+						for (var j = 0; j < tabs.length; j++)
+						{
+							if (tabs[j] == dragTab)
+							{
+								dropIndex = j;
+								break;
+							}
+						}
+
+						if (startIndex != null && dropIndex != startIndex)
+						{
+							this.movePage(startIndex, dropIndex);
+						}
+					}
+
+					if (ui._pageTabDragOverHandler != null)
+					{
+						document.removeEventListener('dragover',
+							ui._pageTabDragOverHandler, true);
+						document.removeEventListener('drop',
+							ui._pageTabDropHandler, true);
+						ui._pageTabDragOverHandler = null;
+						ui._pageTabDropHandler = null;
+					}
+
 					startIndex = null;
+					dragTab = null;
 					evt.stopPropagation();
 					evt.preventDefault();
 				}));
-				
-				mxEvent.addListener(tab, 'dragover', mxUtils.bind(this, function(evt)
+
+				mxEvent.addListener(tab, 'dragover', function(evt)
 				{
-					if (startIndex != null)
+					if (startIndex != null && dragTab != null)
 					{
 						evt.dataTransfer.dropEffect = 'move';
-					}
-					
-					evt.stopPropagation();
-					evt.preventDefault();
-				}));
-				
-				mxEvent.addListener(tab, 'drop', mxUtils.bind(this, function(evt)
-				{
-					if (startIndex != null && index != startIndex)
-					{
-						// LATER: Shift+drag for merge, ctrl+drag for clone 
-						this.movePage(startIndex, index);
+						var target = evt.currentTarget;
+
+						if (target != dragTab)
+						{
+							var rect = target.getBoundingClientRect();
+							var parent = dragTab.parentNode;
+
+							if (evt.clientX < rect.left + rect.width / 2)
+							{
+								parent.insertBefore(dragTab, target);
+							}
+							else if (target.nextSibling != dragTab)
+							{
+								parent.insertBefore(dragTab, target.nextSibling);
+							}
+						}
 					}
 
 					evt.stopPropagation();
 					evt.preventDefault();
-				}));
-				
-				wrapper.appendChild(tab);
-			}))(i, this.createTabForPage(this.pages[i], i + 1));
+				});
+
+				mxEvent.addListener(tab, 'drop', function(evt)
+				{
+					evt.stopPropagation();
+					evt.preventDefault();
+				});
+			}
+
+			if (page == this.currentPage)
+			{
+				activeTab = tab;
+			}
+
+			wrapper.appendChild(tab);
 		}
 
-		var sl = (this.tabScroller != null) ? this.tabScroller.scrollLeft : 0;
 		this.tabContainer.innerText = '';
 
 		// Not chromeless and not read-only file
@@ -1673,14 +1860,111 @@ EditorUi.prototype.updateTabContainer = function()
 		this.rightScrollTab = this.createRightScrollTab();
 		this.tabContainer.appendChild(this.rightScrollTab);
 
+		// Cache tabs by page ID + name for reuse across rebuilds.
+		// This preserves browser translation <font> wrappers.
+		if (Graph.browserTranslate && Graph.isBrowserTranslated())
+		{
+			this.btPageTabCache = {};
+
+			for (var i = 0; i < wrapper.children.length; i++)
+			{
+				var p = (this.pages != null && i < this.pages.length) ?
+					this.pages[i] : null;
+
+				if (p != null)
+				{
+					var key = p.getId() + ':' +
+						(p.getName() || mxResources.get('untitled'));
+					this.btPageTabCache[key] = wrapper.children[i];
+				}
+			}
+		}
+
 		this.tabScroller = wrapper;
-		this.tabScroller.scrollLeft = sl;
-		this.checkTabScrollerOverflow();
 
 		mxEvent.addListener(this.tabScroller, 'scroll', mxUtils.bind(this, function(evt)
 		{
 			this.checkTabScrollerOverflow();
 		}));
+
+		// Preserve tab scroll position across browser translation.
+		// A hidden "canary" paragraph in document.body contains text
+		// in the original language. After tab rebuild we reset the
+		// canary and save scroll position. When Chrome re-translates
+		// the canary we know translation is done and restore scroll.
+		if (Graph.browserTranslate && Graph.isBrowserTranslated())
+		{
+			if (this.btCanary == null)
+			{
+				var ui = this;
+
+				// Canary: a paragraph with enough content for Chrome
+				// to reliably translate. Positioned offscreen but not
+				// display:none. Placed at the end of document.body so
+				// Chrome translates it after the tab labels.
+				this.btCanary = document.createElement('p');
+				this.btCanary.setAttribute('aria-hidden', 'true');
+				this.btCanary.style.cssText = 'position:absolute;left:-10000px;' +
+					'top:0;width:1px;height:1px;overflow:hidden;pointer-events:none;';
+				this.btCanaryOriginal = 'Click here to insert a new page into the document';
+				this.btCanary.textContent = this.btCanaryOriginal;
+				document.body.appendChild(this.btCanary);
+				this.btCanarySavedScroll = null;
+
+				var btRestoreScroll = function()
+				{
+					if (ui.btCanarySavedScroll != null &&
+						ui.tabScroller != null)
+					{
+						ui.btCanarySavedScroll = null;
+						ui.scrollToPage(null, true);
+					}
+				};
+
+				this.btCanaryObserver = new MutationObserver(function()
+				{
+					if (ui.btCanarySavedScroll == null)
+					{
+						return;
+					}
+
+					var canaryText = ui.btCanary.textContent;
+
+					if (canaryText != ui.btCanaryOriginal)
+					{
+						setTimeout(btRestoreScroll, 100);
+					}
+				});
+
+				this.btCanaryObserver.observe(this.btCanary,
+				{
+					characterData: true,
+					childList: true,
+					subtree: true
+				});
+
+				// Initial translation is handled by tab caching —
+				// no canary restore needed for the first load.
+			}
+
+			// Reset canary to original text and save scroll position.
+			// Only save on the first rebuild in a translation cycle —
+			// subsequent rebuilds may already have a shifted scroll.
+			// Skip when there is no cached tab content yet (first load)
+			// or no meaningful scroll position to preserve.
+			// Only arm canary when new tabs were created (cache miss)
+			// that Chrome will need to translate.
+			if (this.btCanarySavedScroll == null && btCacheMiss &&
+				this.btKnownTabScroll > 0)
+			{
+				this.btCanarySavedScroll = this.btKnownTabScroll;
+
+				// Move canary to end of body so Chrome translates it
+				// after all other elements including the tab labels
+				this.btCanary.textContent = this.btCanaryOriginal;
+				document.body.appendChild(this.btCanary);
+			}
+		}
 
 		var ghLink = document.createElement('a');
 		ghLink.href = 'https://github.com/jgraph/drawio';
@@ -1705,6 +1989,26 @@ EditorUi.prototype.updateTabContainer = function()
 		});
 
 		this.tabContainer.appendChild(ghLink);
+
+		if (activeTab != null)
+		{
+			activeTab.classList.add('geActivePage');
+		}
+
+		// Restore scroll position after all DOM mutations (ghLink append,
+		// active class) so the wrapper has its final clientWidth/scrollWidth.
+		// Otherwise sl gets clamped to a temporarily smaller maxScrollLeft
+		// when the previous active page was at the right end.
+		this.tabScroller.scrollLeft = sl;
+		this.scrollToPage();
+		this.btKnownTabScroll = this.tabScroller.scrollLeft;
+		this.checkTabScrollerOverflow();
+
+		if (activeTab != null)
+		{
+			activeTab.scrollIntoView({behavior: 'smooth',
+				block: 'nearest', inline: 'nearest'});
+		}
 	}
 };
 
@@ -1767,6 +2071,11 @@ EditorUi.prototype.createTab = function()
 	var tab = document.createElement('div');
 	tab.className = 'geTab';
 
+	mxEvent.addListener(tab, 'click', mxUtils.bind(this, function(evt)
+	{
+		tab.scrollIntoView({behavior: 'smooth', block: 'nearest', inline: 'nearest'});
+	}));
+
 	return tab;
 };
 
@@ -1821,15 +2130,7 @@ EditorUi.prototype.createPageInsertTab = function()
 	return this.createControlTab(mxResources.get('insertPage'),
 		Editor.plusImage, mxUtils.bind(this, function(evt)
 		{
-			try
-			{
-				this.insertPage();
-			}
-			catch (e)
-			{
-				this.handleError(e);
-			}
-
+			this.actions.get('insertPage').funct();
 			mxEvent.consume(evt);
 		}));
 };
@@ -2035,27 +2336,14 @@ EditorUi.prototype.createPageMenu = function(page, label)
 
 		if (this.editor.graph.isEnabled())
 		{
-			menu.addItem(mxResources.get('duplicate'), null, mxUtils.bind(this, function()
-			{
-				this.duplicatePage(page, mxResources.get('copyOf', [page.getName()]));
-			}), parent);
+			this.menus.addMenuItems(menu, ['duplicatePage', '-'], parent);
 
-			menu.addSeparator(parent);
-			
 			if (this.currentPage == page && this.pages.length > 1)
 			{
 				this.menus.addSubmenu('movePage', menu, parent, mxResources.get('move'));
 			}
 
-			menu.addItem(mxResources.get('delete'), null, mxUtils.bind(this, function()
-			{
-				this.removePage(page);
-			}), parent);
-			
-			menu.addItem(mxResources.get('rename') + '...', null, mxUtils.bind(this, function()
-			{
-				this.renamePage(page, label);
-			}), parent);
+			this.menus.addMenuItems(menu, ['removePage', 'renamePage'], parent);
 		}
 	});
 };

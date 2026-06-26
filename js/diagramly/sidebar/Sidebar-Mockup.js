@@ -110,7 +110,7 @@
 				return sb.createVertexTemplateFromCells([cell], cell.geometry.width, cell.geometry.height, 'Vertical Button Bar');
 			}),
 		    
-			this.createVertexTemplateEntry(s2 + 'buttons.onOffButton;gradientColor=none;' + skcl9 + 'buttonState=on;fillColor2=#008cff;fontColor=#ffffff;fontSize=17;mainText=;spacingRight=40;fontStyle=1;whiteSpace=wrap;',
+			this.createVertexTemplateEntry(s2 + 'buttons.onOffButton;gradientColor=none;' + skcl9 + 'buttonState=on;fillColor2=#008cff;fillColorStyles=fillColor2;fontColor=#ffffff;fontSize=17;mainText=;spacingRight=40;fontStyle=1;whiteSpace=wrap;',
 					150, 50, 'ON', 'On-off button', null, null, this.getTagsForStencil(gn, 'onOffButton', dt + 'on off').join(' '))
 		];
 			
@@ -395,7 +395,7 @@
 				return sb.createVertexTemplateFromCells([cell], cell.geometry.width, cell.geometry.height, 'Radiobutton Group');
 			}),
 		    
-			this.createVertexTemplateEntry(s + 'forms.colorPicker;chosenColor=#aaddff;', 40, 40, '', 'Color Picker', null, null, this.getTagsForStencil(gn, 'colorPicker', dt).join(' ')),
+			this.createVertexTemplateEntry(s + 'forms.colorPicker;chosenColor=#aaddff;frameStrokeColor=#999999;indicatorColor=#ffffff;arrowColor=#999999;', 40, 40, '', 'Color Picker', null, null, this.getTagsForStencil(gn, 'colorPicker', dt).join(' ')),
 			this.createVertexTemplateEntry(s2 + 'forms.comboBox;' + skcl9 + mxConstants.STYLE_FILLCOLOR + '=#ddeeff;align=left;fillColor2=#aaddff;mainText=;fontColor=#666666;fontSize=17;spacingLeft=3;',
 										150, 30, 'Option 1', 'Combo Box', null, null, this.getTagsForStencil(gn, 'comboBox', dt).join(' ')),
 			this.createVertexTemplateEntry(s2 + 'forms.spinner;' + skcl9 + 'spinLayout=right;spinStyle=normal;adjStyle=triangle;fillColor=#aaddff;fontSize=17;fontColor=#666666;mainText=;html=1;overflow=fill;',
@@ -491,9 +491,9 @@
 		   		return sb.createVertexTemplateFromCells([button1, button2, button3], 230, 30, 'Wedge Bar');
 			}),
 
-			this.createVertexTemplateEntry(s + 'menus_and_buttons.font_style_selector_1;fillColorStyles=fillColor2,fillColor3,fillColor4,fontColor2,fontColor3;strokeColorStyles=strokeColor2,strokeColor3,strokeColor4;fillColor2=#e3e3e4;fillColor3=#cee3ff;fillColor4=#fcff68;fontColor2=#000000;fontColor3=#000000;strokeColor2=#a4a4a4;strokeColor3=#fece7a;strokeColor4=#000000;fillColor=none;strokeColor=none;', 136, 31, '', 'Formatting Toolbar 1', null, null, this.getTagsForStencil('mxgraph.mockup.menus_and_buttons', 'font_style_selector_1', dt).join(' ')),
-			this.createVertexTemplateEntry(s + 'menus_and_buttons.font_style_selector_2;fillColorStyles=fillColor2,fillColor3,fillColor4,fontColor2,fontColor3;strokeColorStyles=strokeColor2,strokeColor3,strokeColor4;fillColor2=#e3e3e4;fillColor3=#cee3ff;fillColor4=#fcff68;fontColor2=#000000;fontColor3=#000000;strokeColor2=#a4a4a4;strokeColor3=#fece7a;strokeColor4=#000000;fillColor=none;strokeColor=none;', 235, 31, '', 'Formatting Toolbar 2', null, null, this.getTagsForStencil('mxgraph.mockup.menus_and_buttons', 'font_style_selector_2', dt).join(' ')),
-			this.createVertexTemplateEntry(s + 'menus_and_buttons.font_style_selector_3;fillColorStyles=fillColor2,fillColor3,fillColor4,fontColor2,fontColor3;strokeColorStyles=strokeColor2,strokeColor3,strokeColor4;fillColor2=#e3e3e4;fillColor3=#cee3ff;fillColor4=#fcff68;fontColor2=#000000;fontColor3=#000000;strokeColor2=#a4a4a4;strokeColor3=#fece7a;strokeColor4=#000000;fillColor=none;strokeColor=none;', 176, 38, '', 'Formatting Toolbar 3', null, null, this.getTagsForStencil('mxgraph.mockup.menus_and_buttons', 'font_style_selector_3', dt).join(' ')),
+			this.createVertexTemplateEntry(s + 'menus_and_buttons.font_style_selector_1;fillColor=none;strokeColor=none;', 136, 31, '', 'Formatting Toolbar 1', null, null, this.getTagsForStencil('mxgraph.mockup.menus_and_buttons', 'font_style_selector_1', dt).join(' ')),
+			this.createVertexTemplateEntry(s + 'menus_and_buttons.font_style_selector_2;fillColor=none;strokeColor=none;', 235, 31, '', 'Formatting Toolbar 2', null, null, this.getTagsForStencil('mxgraph.mockup.menus_and_buttons', 'font_style_selector_2', dt).join(' ')),
+			this.createVertexTemplateEntry(s + 'menus_and_buttons.font_style_selector_3;fillColor=none;strokeColor=none;', 176, 38, '', 'Formatting Toolbar 3', null, null, this.getTagsForStencil('mxgraph.mockup.menus_and_buttons', 'font_style_selector_3', dt).join(' ')),
 			this.createVertexTemplateEntry(s2 + 'forms.searchBox;' + skcl9 + 'mainText=;strokeColor2=#008cff;fontColor=#666666;fontSize=17;align=left;spacingLeft=3;whiteSpace=wrap;',
 										150, 30, 'Search', 'Search Box', null, null, this.getTagsForStencil(gn, 'searchBox', dt).join(' ')),
 			this.addDataEntry(dt + 'sign in', 200, 300, 'Sign In',
@@ -695,7 +695,7 @@
 		   		return sb.createVertexTemplateFromCells([bg], bg.geometry.width, bg.geometry.height, 'Gantt Chart');
 			}),				
 				
-			this.createVertexTemplateEntry(s + 'misc.map;fillColorStyles=fillColor2,fillColor3,fillColor4,fillColor5,fillColor6;strokeColorStyles=strokeColor2,strokeColor3;fillColor2=#ffffff;fillColor3=#ffca8c;fillColor4=#d87146;fillColor5=#b2d8ad;fillColor6=#ffffff;strokeColor2=#000000;strokeColor3=#d87146;fillColor=none;strokeColor=none;', 250, 250, '', 'Map', null, null, this.getTagsForStencil(gn, 'map', dt).join(' '))
+			this.createVertexTemplateEntry(s + 'misc.map;fillColor=none;strokeColor=none;', 250, 250, '', 'Map', null, null, this.getTagsForStencil(gn, 'map', dt).join(' '))
 		];
 		
 		this.addPalette('mockupGraphics', 'Mockup Graphics', false, mxUtils.bind(this, function(content)
@@ -758,7 +758,7 @@
 
 		var fns =
 		[
-			this.createVertexTemplateEntry(s + 'misc.help_icon;fillColorStyles=fillColor2,fontColor2;strokeColorStyles=strokeColor2;fillColor2=#cccccc;fontColor2=#2c457e;strokeColor2=#666666;fillColor=none;strokeColor=none;', 
+			this.createVertexTemplateEntry(s + 'misc.help_icon;fillColor=none;strokeColor=none;', 
 					32, 32, '', 'Help Icon', null, null, this.getTagsForStencil(gn, 'help_icon', dt).join(' ')),
 			this.createVertexTemplateEntry(s + 'misc.playbackControls;sketch=0;' + skcl9 + 'fillColor2=#99ddff;strokeColor2=none;fillColor3=#ffffff;strokeColor3=none;',
 					250, 30, '', 'Playback Controls', null, null, this.getTagsForStencil(gn, 'playbackControls', dt).join(' ')),
@@ -825,15 +825,15 @@
 			this.addDataEntry(dt + 'status bar', 500, 30, 'Status Bar',
 				'7VddT8IwFP01e4R0rUN4FZUXfcLE57pd1sZuXdoi4K/3risCDnRESIhxyZLe093d23NO9xGxcbGcGF6JR52BithdxMZGa9eMiuUYlIookVnEbiNKCZ4RvT8wG/tZUnEDpeuSQJuEN67m0CANYN1KBcA6o1/hWWZOIBBH7MYKnukFBgSDjFsBWQi4knmJ4xTLg0FAuEJtsqr6lsUyr5fbL3T6Oq/6hbRp3xhIsd8bM5XvEO7V1B1rpY1vhI38gTMzqdQWPvMH4mEtYBwsD/LhoUDGBHQBzqzwkkVYH84mpOGMCJC5CGksYNw2cf6ZumEXB4Hg/WSzFtlTx93cIoYdu4tgPmkxX+oSatJ16cI1cRLiDuJkGYAXZ92gglldz1Y8lWX+4CNfdSGkgynCdYkFNtpVUbpf0ZCQNAmrnWhL7XiUtNWmJ1D7qqX2kxeZXMYW+3NCU/Kj1Ps29imkTg5Jzf6lPofULCY/SR2faVcPLuOFyctU1HKcgs2r0e7GWVP3G5quO9AUloeJsrLwxWbBoa2PAEKGqfeeASvf+Ytafy5sEdeJk8G3nPTorsN6a8dteYye6Wky/IMWG5zeYqPuFlPySDN1WvLwKAe1n1H7/BMf7x8MN/8Lfm7nd+ID'),
 
-			this.createVertexTemplateEntry(s3 + 'misc.pin;fillColor2=#00dd00;fillColor3=#004400;strokeColor=#006600;',
+			this.createVertexTemplateEntry(s3 + 'misc.pin;fillColor2=#00dd00;fillColor3=#004400;strokeColor=#006600;fillColor4=#ffffff;strokeColor2=#666666;',
 										10, 25, '', 'Pin', null, null, this.getTagsForStencil(gn, 'pin', dt).join(' ')),
-			this.createVertexTemplateEntry(s3 + 'misc.pin;fillColor2=#dd0000;fillColor3=#440000;strokeColor=#660000;',
+			this.createVertexTemplateEntry(s3 + 'misc.pin;fillColor2=#dd0000;fillColor3=#440000;strokeColor=#660000;fillColor4=#ffffff;strokeColor2=#666666;',
 										10, 25, '', 'Pin', null, null, this.getTagsForStencil(gn, 'pin', dt).join(' ')),
-			this.createVertexTemplateEntry(s3 + 'misc.pin;fillColor2=#ccccff;fillColor3=#0000ff;strokeColor=#000066;',
+			this.createVertexTemplateEntry(s3 + 'misc.pin;fillColor2=#ccccff;fillColor3=#0000ff;strokeColor=#000066;fillColor4=#ffffff;strokeColor2=#666666;',
 										10, 25, '', 'Pin', null, null, this.getTagsForStencil(gn, 'pin', dt).join(' ')),
-			this.createVertexTemplateEntry(s3 + 'misc.pin;fillColor2=#ffff00;fillColor3=#888800;strokeColor=#999900;',
+			this.createVertexTemplateEntry(s3 + 'misc.pin;fillColor2=#ffff00;fillColor3=#888800;strokeColor=#999900;fillColor4=#ffffff;strokeColor2=#666666;',
 										10, 25, '', 'Pin', null, null, this.getTagsForStencil(gn, 'pin', dt).join(' ')),
-			this.createVertexTemplateEntry(s3 + 'misc.pin;fillColor2=#ffa500;fillColor3=#885000;strokeColor=#997000;',
+			this.createVertexTemplateEntry(s3 + 'misc.pin;fillColor2=#ffa500;fillColor3=#885000;strokeColor=#997000;fillColor4=#ffffff;strokeColor2=#666666;',
 										10, 25, '', 'Pin', null, null, this.getTagsForStencil(gn, 'pin', dt).join(' '))
 		];
 		
@@ -867,11 +867,11 @@
 			this.addDataEntry(dt + 'breadcrumb', 300, 30, 'Breadcrumb',
 				'7VaxboMwEP0ar8jYlGQObbK0U4fOFhhsxWBknIT063uAC40CUoeAGGIJyXfnO87v+VlGNMrrg2Gl+NAJV4i+IRoZrW03y+uIK4UIlgmir4gQDB8i+4mo30ZxyQwv7H8SSJdwZurEO887u3IDLleqslflIpU1+si/ZGIFOHxEd5Vgib6AgcFIWCV44gymZFbAPIY+oBzdCZurIatsSuZ11uzby3V8PJVewc4yY1bqwmNFLHSTlerCfsrvZrW/cXakVRODjmjYjt91rtPmF25X3FheTyLTuhwsB65zbs0VllzcBiEaduBhwWUmXBZ1PlZ1dtZnDjDDxCE9jjq9Qx2RMLN946sBnQT3oLN2PBj0+hbwPxyQmTgIJk8+WRkJi518l7C9J2EuIbw8hTDOgR8sp4RwUgl0ZSwsrQR/5D6aSwqbpxTGSejP/QJS2E5KIVgZC2NSwHgbp+lMLIxcSA+SApjDg7eN3byHfwA='),
 
-			this.createVertexTemplateEntry(s2 + 'navigation.stepBar;strokeColor=#c4c4c4;textColor=#666666;textColor2=#008cff;mainText=,,+,;textSize=17;fillColor=#666666;overflow=fill;fontSize=17;fontColor=#666666;', 300, 50, 
+			this.createVertexTemplateEntry(s2 + 'navigation.stepBar;strokeColor=#c4c4c4;textColor=#666666;textColor2=#008cff;haloColor=#ffffff;mainText=,,+,;textSize=17;fillColor=#666666;overflow=fill;fontSize=17;fontColor=#666666;', 300, 50, 
 				'<table border="0" cellpadding="0" cellspacing="0" width="100%" height="100%" style="font-size:1em;">' +
 				'<tr height="0%"><td width="25%">Layer 1</td><td width="25%">Layer 2</td><td width="25%" style="color:#008cff;">Layer 3</td><td width="25%">Layer 4</td></tr><tr height="100%"><td/></tr></table>', 
 				'Step Bar', null, null, this.getTagsForStencil(gn, 'stepBar', dt + 'step bar').join(' ')),
-			this.createVertexTemplateEntry(s2 + 'navigation.stepBar;strokeColor=#c4c4c4;textColor=#666666;textColor2=#008cff;mainText=Layer 1,Layer 2,+Layer 3,Layer 4;textSize=17;fillColor=#666666;overflow=fill;fontSize=17;fontColor=#666666;', 
+			this.createVertexTemplateEntry(s2 + 'navigation.stepBar;strokeColor=#c4c4c4;textColor=#666666;textColor2=#008cff;haloColor=#ffffff;mainText=Layer 1,Layer 2,+Layer 3,Layer 4;textSize=17;fillColor=#666666;overflow=fill;fontSize=17;fontColor=#666666;', 
 				300, 50, '', 'Step Bar', null, null, this.getTagsForStencil(gn, 'stepBar', dt + 'step bar').join(' ')),
 			this.createVertexTemplateEntry(s + 'navigation.coverFlow;strokeColor=#999999;',
 				400, 200, '', 'Cover Flow', null, null, this.getTagsForStencil(gn, 'coverFlow', dt + 'cover flow').join(' ')),

@@ -236,10 +236,9 @@ App.DROPBOX_URL = 'js/dropbox/Dropbox-sdk.min.js';
 App.DROPINS_URL = 'https://www.dropbox.com/static/api/2/dropins.js';
 
 /**
- * OneDrive Client JS (file/folder picker). This is a slightly modified version to allow using accessTokens
- * But it doesn't work for IE11, so we fallback to the original one
+ * OneDrive Client JS (file/folder picker). This is a slightly modified version to allow using accessTokens.
  */
-App.ONEDRIVE_URL = mxClient.IS_IE11? 'https://js.live.net/v7.2/OneDrive.js' : 'js/onedrive/OneDrive.js';
+App.ONEDRIVE_URL = 'js/onedrive/OneDrive.js';
 
 /**
  * Trello URL
@@ -500,8 +499,8 @@ App.getStoredMode = function()
 						navigator.userAgent.indexOf('MSIE') < 0 || document.documentMode >= 10))
 					{
 						// Immediately loads client
-						if (App.mode == App.MODE_ONEDRIVE || (window.location.hash != null &&
-							window.location.hash.substring(0, 2) == '#W'))
+						if (App.mode == App.MODE_ONEDRIVE || App.mode == App.MODE_M365 || (window.location.hash != null &&
+							(window.location.hash.substring(0, 2) == '#W' || window.location.hash.substring(0, 2) == '#M')))
 						{
 							//Editor.oneDriveInlinePicker can be set with configuration which is done later, so load it all time
 							mxscript(App.ONEDRIVE_URL);
@@ -518,11 +517,10 @@ App.getStoredMode = function()
 					}
 				}
 				
-				// Loads Trello for all browsers but < IE10 if not disabled or if enabled and in embed mode
+				// Loads Trello if not disabled or if enabled and in embed mode
 				if (typeof window.TrelloClient === 'function')
 				{
-					if (urlParams['tr'] == '1' && isSvgBrowser && !mxClient.IS_IE11 &&
-						(document.documentMode == null || document.documentMode >= 10))
+					if (urlParams['tr'] == '1' && isSvgBrowser)
 					{
 						// Immediately loads client
 						if (App.mode == App.MODE_TRELLO || (window.location.hash != null &&
@@ -648,6 +646,17 @@ App.main = function(callback, createUi)
 		Editor.loadCompatibleCss();
 		
 		App.isMainCalled = true;
+
+		// Detects Android tablets using Chrome's "Request Desktop Site"
+		// mode where the user agent shows Linux instead of Android.
+		// Use android=1 to force or android=0 to suppress detection.
+		if (urlParams['android'] == '1' || (urlParams['android'] != '0' &&
+			!mxClient.IS_ANDROID && mxClient.IS_LINUX && mxClient.IS_GC &&
+			navigator.maxTouchPoints > 1))
+		{
+			mxClient.IS_ANDROID = true;
+		}
+
 		// Handles uncaught errors before the app is loaded
 		window.onerror = function(message, url, linenumber, colno, err)
 		{
@@ -735,6 +744,54 @@ App.main = function(callback, createUi)
 						if (reg != null)
 						{
 							EditorUi.debug('App.main', 'Updating service worker');
+
+							// Notifies the user once a newer version becomes available. A
+							// non-null controller means this is an update, not a first install.
+							var notifyUpdate = function()
+							{
+								if (!App.updateAvailable && navigator.serviceWorker.controller != null)
+								{
+									App.updateAvailable = true;
+
+									if (App.onUpdateAvailable != null)
+									{
+										App.onUpdateAvailable();
+									}
+								}
+							};
+
+							// Tracks a worker until it is installed (waiting) or activated
+							var trackWorker = function(worker)
+							{
+								if (worker != null)
+								{
+									if (worker.state == 'installed' || worker.state == 'activated')
+									{
+										notifyUpdate();
+									}
+									else
+									{
+										worker.addEventListener('statechange', function()
+										{
+											if (worker.state == 'installed' || worker.state == 'activated')
+											{
+												notifyUpdate();
+											}
+										});
+									}
+								}
+							};
+
+							// Covers an update already in progress or waiting when this runs,
+							// as well as one found by the reg.update() call below
+							trackWorker(reg.installing);
+							trackWorker(reg.waiting);
+
+							reg.addEventListener('updatefound', function()
+							{
+								trackWorker(reg.installing);
+							});
+
 							reg.update();
 						}
 						// Skips service worker install on first load
@@ -1033,11 +1090,10 @@ App.main = function(callback, createUi)
 								window.OneDriveClient = null;
 							}
 							
-							// Loads Trello for all browsers but < IE10 if not disabled or if enabled and in embed mode
-							if (typeof window.TrelloClient === 'function' && !mxClient.IS_IE11 &&
+							// Loads Trello if not disabled or if enabled and in embed mode
+							if (typeof window.TrelloClient === 'function' &&
 								typeof window.Trello === 'undefined' && window.DrawTrelloClientCallback != null &&
-								urlParams['tr'] == '1' && (navigator.userAgent == null ||
-								navigator.userAgent.indexOf('MSIE') < 0 || document.documentMode >= 10))
+								urlParams['tr'] == '1')
 							{
 								mxscript(App.TRELLO_JQUERY_URL, function()
 								{
@@ -1483,11 +1539,43 @@ App.prototype.initializeViewerMode = function()
 };
 
 /**
- * Translates this point by the given vector.
- * 
- * @param {number} dx X-coordinate of the translation.
- * @param {number} dy Y-coordinate of the translation.
+ * Shows a notification in the notification bell when a newer version of the
+ * app is available. Clicking it clears the service worker cache (forcing the
+ * new version to be loaded on the next start) and prompts for a restart.
  */
+App.prototype.showUpdateNotification = function(test)
+{
+	// Only handles updates on the official hosted domains (test bypasses this)
+	if (this.editor.isChromelessView() || urlParams['embed'] == '1' ||
+		(!test && !this.isOwnGDriveDomain()))
+	{
+		return;
+	}
+
+	this.updateNotif = {timestamp: Date.now(), isNew: true,
+		content: mxResources.get('appUpdateAvailable'),
+		funct: mxUtils.bind(this, function()
+	{
+		// TODO: Remove. Pass-through to test the restart dialog without a
+		// service worker to clear (e.g. in dev mode)
+		if (test)
+		{
+			this.alert(mxResources.get('restartForChangeRequired'));
+		}
+		else
+		{
+			App.clearServiceWorker(mxUtils.bind(this, function()
+			{
+				this.alert(mxResources.get('restartForChangeRequired'));
+			}));
+		}
+	})};
+
+	// Merges with any server notifications and (re)attaches the bell
+	this.showNotification(this.lastNotifs, this.lastNotifReadFlag);
+	this.updateButtonContainer(true);
+};
+
 App.prototype.init = function()
 {
 	if (App.blockedAncestorFrames())
@@ -1505,6 +1593,23 @@ App.prototype.init = function()
 	 */	
 	this.descriptorChangedListener = mxUtils.bind(this, this.descriptorChanged);
 
+	// Shows a notification when a newer app version becomes available. The
+	// detection runs in App.main so the hook covers both orderings (update
+	// found before or after the UI is initialized).
+	App.onUpdateAvailable = mxUtils.bind(this, this.showUpdateNotification);
+
+	// ?test-update=1 simulates an available update for testing (TODO: remove)
+	if (App.updateAvailable || urlParams['test-update'] == '1')
+	{
+		var testUpdate = urlParams['test-update'] == '1';
+
+		// Deferred so the menubar is ready (and to mimic async arrival)
+		window.setTimeout(mxUtils.bind(this, function()
+		{
+			this.showUpdateNotification(testUpdate);
+		}), testUpdate ? 3000 : 0);
+	}
+
 	this.addListener('currentThemeChanged', mxUtils.bind(this, function()
 	{
 		if (this.compactMode && this.isDefaultTheme(Editor.currentTheme))
@@ -1518,9 +1623,7 @@ App.prototype.init = function()
 	 */
 	try
 	{
-		this.gitHub = (!mxClient.IS_IE || document.documentMode == 10 ||
-				mxClient.IS_IE11 || mxClient.IS_EDGE) &&
-				(urlParams['gh'] != '0' && (urlParams['embed'] != '1' ||
+		this.gitHub = (urlParams['gh'] != '0' && (urlParams['embed'] != '1' ||
 				urlParams['gh'] == '1')) ? new GitHubClient(this) : null;
 		
 		if (this.gitHub != null)
@@ -1545,9 +1648,7 @@ App.prototype.init = function()
 	 */
 	try
 	{
-		this.gitLab = (!mxClient.IS_IE || document.documentMode == 10 ||
-			mxClient.IS_IE11 || mxClient.IS_EDGE) &&
-			(urlParams['gl'] != '0' && (urlParams['embed'] != '1' ||
+		this.gitLab = (urlParams['gl'] != '0' && (urlParams['embed'] != '1' ||
 			urlParams['gl'] == '1')) ? new GitLabClient(this) : null;
 
 		if (this.gitLab != null)
@@ -1609,7 +1710,7 @@ App.prototype.init = function()
 		initOneDriveClient();
 	}
 
-	if (urlParams['ms365'] != '0')
+	if (urlParams['ms365'] != '0' && !EditorUi.isElectronApp)
 	{
 		try
 		{
@@ -1831,7 +1932,7 @@ App.prototype.init = function()
 				// Fits diagram to window
 				if (Editor.fitDiagramOnLoad)
 				{
-					this.initialFitDiagram();
+					this.fitInitialView();
 				}
 			}));
 		}
@@ -2555,10 +2656,12 @@ App.prototype.getThumbnail = function(width, fn, border)
 
 			if (this.currentPage == page)
 			{
+				graph.mathEnabled = this.editor.graph.mathEnabled;
 				graph.setBackgroundImage(bgImg);
 			}
 			else if (page.viewState != null && page.viewState != null)
 			{
+				graph.mathEnabled = page.viewState.mathEnabled;
 				bgImg = page.viewState.backgroundImage;
 				graph.setBackgroundImage(bgImg);
 			}
@@ -2952,6 +3055,14 @@ App.prototype.open = function()
 					this.fileLoaded((mxClient.IS_IOS) ?
 						new StorageFile(this, xml, filename) :
 						new LocalFile(this, xml, filename, temp));
+					
+					// Marks temp files as changed to trigger draft save
+					var file = this.getCurrentFile();
+
+					if (temp && file != null)
+					{
+						file.fileChanged();
+					}
 				}));
 			}
 		}
@@ -3190,8 +3301,16 @@ App.prototype.start = function()
 			// Ignores Grammarly error [1344]
 			if (message != 'ResizeObserver loop limit exceeded')
 			{
-				EditorUi.logError('Uncaught: ' + ((message != null) ? message : ''),
-					url, linenumber, colno, err, null, true);
+				// "Invalid or unexpected token" is a JS engine parse error that can only
+				// come from eval() or new Function(). All eval() calls in the codebase are
+				// wrapped in try/catch, so this reaching window.onerror indicates external
+				// interference (browser extensions, corrupted cache, proxy injection).
+				if (message == null || message.indexOf('Invalid or unexpected token') < 0)
+				{
+					EditorUi.logError('Uncaught: ' + ((message != null) ? message : ''),
+						url, linenumber, colno, err, null, true);
+				}
+
 				ui.handleError({message: message}, mxResources.get('unknownError'),
 					null, null, null, null, true);
 			}
@@ -3519,21 +3638,35 @@ App.prototype.start = function()
 						
 						var dlg = new CreateDialog(this, title, mxUtils.bind(this, function(filename, mode)
 						{
-							if (mode == null)
+							try
 							{
-								this.hideDialog();
-								var prev = Editor.useLocalStorage;
-								this.createFile((filename.length > 0) ? filename : this.defaultFilename,
-									this.getFileData(), null, null, null, true, null, true);
-								Editor.useLocalStorage = prev;
-							}
-							else
-							{
-								this.pickFolder(mode, mxUtils.bind(this, function(folderId)
+								if (mode == null)
 								{
-									this.createFile(filename, this.getFileData(true),
-										null, mode, null, true, folderId);
-								}));
+									this.hideDialog();
+									var prev = Editor.useLocalStorage;
+									this.createFile((filename.length > 0) ? filename : this.defaultFilename,
+										this.getFileData(), null, null, null, true, null, true);
+									Editor.useLocalStorage = prev;
+								}
+								else
+								{
+									this.pickFolder(mode, mxUtils.bind(this, function(folderId)
+									{
+										try
+										{
+											this.createFile(filename, this.getFileData(true),
+												null, mode, null, true, folderId);
+										}
+										catch (e)
+										{
+											this.handleError(e);
+										}
+									}));
+								}
+							}
+							catch (e)
+							{
+								this.handleError(e);
 							}
 						}), null, null, null, null, urlParams['browser'] == '1',
 							null, null, true, rowLimit, null, null, null,
@@ -3692,13 +3825,30 @@ App.prototype.executeCreateObject = function(value, done)
 					// Fits diagram to window
 					this.initialFitDiagram(1.2);
 
+					// Easter egg: pop effect animates all cells on load
+					if (value.effect == 'pop')
+					{
+						var graph = this.editor.graph;
+						var cells = graph.model.getDescendants(
+							graph.model.getRoot());
+						var nodes = graph.getNodesForCells(cells);
+						Graph.setOpacityForNodes(nodes, 0);
+
+						window.setTimeout(mxUtils.bind(this, function()
+						{
+							var animations = graph.createPopAnimations(
+								cells, true);
+							graph.executeAnimations(animations);
+						}), 200);
+					}
+
 					// Needs to go before upate of hash if
 					// it replaces the history state
 					if (done != null)
 					{
 						done();
 					}
-					
+
 					// Sets create value with compressed XML
 					value.type = 'xml';
 					value.compressed = true;
@@ -3717,15 +3867,15 @@ App.prototype.executeCreateObject = function(value, done)
 
 		if (value.type == 'mermaid')
 		{
-			if (window.isMermaidEnabled)
+			if (EditorUi.isMermaidSupported())
 			{
 				this.parseMermaidDiagram(data, null, mxUtils.bind(this, function(xml)
 				{
-					createDiagram(xml);
+					createDiagram(mxMermaidToDrawio.wrapGroup(xml, data, null));
 				}), mxUtils.bind(this, function(e)
 				{
 					this.handleError(e);
-				}), null, true);
+				}));
 			}
 			else
 			{
@@ -3742,7 +3892,7 @@ App.prototype.executeCreateObject = function(value, done)
 			}, mxUtils.bind(this, function(e)
 			{
 				this.handleError(e, mxResources.get('errorLoadingFile'));
-			}), true, {complexity: 'high'});
+			}), {complexity: 'high'});
 		}
 		else if (value.type == 'csv')
 		{
@@ -3777,7 +3927,13 @@ App.prototype.openGenerateDialog = function(prompt)
 {
 	if (this.chatWindow == null)
 	{
-		this.chatWindow = new ChatWindow(this, 224, 104, 280, 320);
+		var saved = mxSettings.getWindowState('chat');
+		var cx = (saved != null && saved.x != null) ? saved.x : 224;
+		var cy = (saved != null && saved.y != null) ? saved.y : 104;
+		var cw = (saved != null && saved.w != null) ? saved.w : 360;
+		var ch = (saved != null && saved.h != null) ? saved.h : 480;
+
+		this.chatWindow = new ChatWindow(this, cx, cy, cw, ch);
 		this.chatWindow.window.addListener('show', mxUtils.bind(this, function()
 		{
 			this.fireEvent(new mxEventObject('chat'));
@@ -3786,7 +3942,18 @@ App.prototype.openGenerateDialog = function(prompt)
 		{
 			this.fireEvent(new mxEventObject('chat'));
 		});
-		this.chatWindow.window.setVisible(true);
+
+		this.installWindowPersistence('chat', this.chatWindow);
+
+		if (saved != null && prompt == null)
+		{
+			this.restoreWindowState('chat', this.chatWindow);
+		}
+		else
+		{
+			this.chatWindow.window.setVisible(true);
+		}
+
 		this.fireEvent(new mxEventObject('chat'));
 	}
 	else
@@ -3887,13 +4054,24 @@ App.prototype.filterDrafts = function(filePath, guid, callback)
 					if (key != null && key.substring(0, 7) == '.draft_')
 					{
 						var obj = JSON.parse(items[i].data);
-						
-						if (obj != null && obj.type == 'draft' && obj.aliveCheck != guid && 
+
+						if (obj != null && obj.type == 'draft' && obj.aliveCheck != guid &&
 							((filePath == null && obj.fileObject == null) ||
-								(obj.fileObject != null && obj.fileObject.path == filePath)))	
+								(obj.fileObject != null && obj.fileObject.path == filePath)))
 						{
-							obj.key = key;
-							drafts.push(obj);
+							// Drop drafts whose payload has no user-added cells.
+							// These get created when a recovery draft is saved
+							// for a file the user then emptied; surfacing them
+							// in the draft picker only confuses the user.
+							if (this.isDiagramDataEmpty(obj.data))
+							{
+								this.removeDatabaseItem(key);
+							}
+							else
+							{
+								obj.key = key;
+								drafts.push(obj);
+							}
 						}
 					}
 				}
@@ -3971,8 +4149,15 @@ App.prototype.checkDrafts = function()
 							}
 							else
 							{
-								this.createFile(this.defaultFilename, this.getFileData(),
-									null, null, null, null, null, true);
+								try
+								{
+									this.createFile(this.defaultFilename, this.getFileData(),
+										null, null, null, null, null, true);
+								}
+								catch (e)
+								{
+									this.handleError(e);
+								}
 							}
 						}
 					}));
@@ -3984,8 +4169,15 @@ App.prototype.checkDrafts = function()
 				}
 				else
 				{
-					this.createFile(this.defaultFilename, this.getFileData(),
-						null, null, null, null, null, true);
+					try
+					{
+						this.createFile(this.defaultFilename, this.getFileData(),
+							null, null, null, null, null, true);
+					}
+					catch (e)
+					{
+						// ignore
+					}
 				}
 			}));
 		}), 0);
@@ -4393,21 +4585,29 @@ App.prototype.pickFile = function(mode)
 				this.openFile();
 				
 				// Installs local handler for opened files in same window
-				window.openFile.setConsumer(mxUtils.bind(this, function(xml, filename)
+				window.openFile.setConsumer(mxUtils.bind(this, function(xml, filename, temp)
 				{
 					var doOpenFile = mxUtils.bind(this, function()
 					{
 						// Replaces PNG with XML extension
 						var dot = !Editor.useCanvasForExport && filename.substring(filename.length - 4) == '.png';
-						
+
 						if (dot)
 						{
 							filename = filename.substring(0, filename.length - 4) + '.drawio';
 						}
-		
+
 						this.fileLoaded((mode == App.MODE_BROWSER) ?
 							new StorageFile(this, xml, filename) :
-							new LocalFile(this, xml, filename));
+							new LocalFile(this, xml, filename, temp));
+
+						// Marks temp files as changed to trigger draft save
+						var file = this.getCurrentFile();
+
+						if (temp && file != null)
+						{
+							file.fileChanged();
+						}
 					});
 					
 					var currentFile = this.getCurrentFile();
@@ -4902,24 +5102,31 @@ App.prototype.saveFile = function(forceDialog, success)
 						{
 							var createFile = mxUtils.bind(this, function(folderId)
 							{
-								var graph = this.editor.graph;
-								var selection = graph.getSelectionCells();
-								var viewState = graph.getViewState();
-								var page = this.currentPage;
+								try
+								{
+									var graph = this.editor.graph;
+									var selection = graph.getSelectionCells();
+									var viewState = graph.getViewState();
+									var page = this.currentPage;
 
-								// Opens new window if not temporary file
-								var currentFile = this.getCurrentFile();
-								var replace = this.mode == null || (currentFile == null ||
-										currentFile.mode == null);
-								
-								this.createFile(name, this.getFileData(/(\.xml)$/i.test(name) ||
-									name.indexOf('.') < 0 || /(\.drawio)$/i.test(name),
-									/(\.svg)$/i.test(name), /(\.html)$/i.test(name)), null,
-									mode, done, replace, folderId, null, null,
-									mxUtils.bind(this, function()
-									{
-										this.restoreViewState(page, viewState, selection);
-									}));
+									// Opens new window if not temporary file
+									var currentFile = this.getCurrentFile();
+									var replace = this.mode == null || (currentFile == null ||
+											currentFile.mode == null);
+
+									this.createFile(name, this.getFileData(/(\.xml)$/i.test(name) ||
+										name.indexOf('.') < 0 || /(\.drawio)$/i.test(name),
+										/(\.svg)$/i.test(name), /(\.html)$/i.test(name)), null,
+										mode, done, replace, folderId, null, null,
+										mxUtils.bind(this, function()
+										{
+											this.restoreViewState(page, viewState, selection);
+										}));
+								}
+								catch (e)
+								{
+									this.handleError(e);
+								}
 							});
 
 							if (folderId != null)
@@ -4943,8 +5150,15 @@ App.prototype.saveFile = function(forceDialog, success)
 
 			var dlg = new SaveDialog(this, filename, mxUtils.bind(this, function(input, mode, folderId)
 			{
-				saveFunction(input.value, mode, input, folderId);
-				this.hideDialog();
+				try
+				{
+					saveFunction(input.value, mode, input, folderId);
+					this.hideDialog();
+				}
+				catch (e)
+				{
+					this.handleError(e);
+				}
 			}), (allowTab) ? null : ['_blank']);
 
 			this.showDialog(dlg.container, 420, 150, true, false, mxUtils.bind(this, function()
@@ -4982,7 +5196,7 @@ App.prototype.loadTemplate = function(url, onload, onerror, templateFilename, as
 	{
 		try
 		{
-			var data = (!base64) ? responseData : ((window.atob && !mxClient.IS_IE && !mxClient.IS_IE11) ?
+			var data = (!base64) ? responseData : ((window.atob) ?
 				atob(responseData) : Base64.decode(responseData));
 			
 			if (isVisioFilename || this.isVisioData(data))
@@ -5585,43 +5799,50 @@ App.prototype.loadFile = function(id, sameWindow, file, success, force)
 			}
 			else if (id.substring(0, 7) == 'create=')
 			{
-				var obj = JSON.parse(decodeURIComponent(id.substring(7)));
-
-				if (obj.type == 'message')
+				try
 				{
-					var sourceWindow = window.opener || window.parent;;
+					var obj = JSON.parse(decodeURIComponent(id.substring(7)));
 
-					var createMessageHandler = mxUtils.bind(this, function(evt)
+					if (obj.type == 'message')
 					{
-						EditorUi.debug('EditorUi.createMessageHandler',
-							[this], 'evt', [evt]);
+						var sourceWindow = window.opener || window.parent;;
 
-						if (evt.source != sourceWindow)
+						var createMessageHandler = mxUtils.bind(this, function(evt)
 						{
-							return;
-						}
-						
-						try
-						{
-							if (evt.data.action == 'create' && evt.data.data != null)
+							EditorUi.debug('EditorUi.createMessageHandler',
+								[this], 'evt', [evt]);
+
+							if (evt.source != sourceWindow)
 							{
-								mxEvent.removeListener(window, 'message', createMessageHandler);
-								this.executeCreateObject(evt.data.data);
+								return;
 							}
-						}
-						catch (e)
-						{
-							data = null;
-						}
-					});
-					
-					// Sends ready message to source window to trigger sending of create message with data
-					mxEvent.addListener(window, 'message', createMessageHandler);
-					sourceWindow.postMessage(JSON.stringify({event: 'ready'}), '*');
+
+							try
+							{
+								if (evt.data.action == 'create' && evt.data.data != null)
+								{
+									mxEvent.removeListener(window, 'message', createMessageHandler);
+									this.executeCreateObject(evt.data.data);
+								}
+							}
+							catch (e)
+							{
+								data = null;
+							}
+						});
+
+						// Sends ready message to source window to trigger sending of create message with data
+						mxEvent.addListener(window, 'message', createMessageHandler);
+						sourceWindow.postMessage(JSON.stringify({event: 'ready'}), '*');
+					}
+					else
+					{
+						this.executeCreateObject(obj);
+					}
 				}
-				else
+				catch (e)
 				{
-					this.executeCreateObject(obj);
+					this.handleError(e, mxResources.get('errorLoadingFile'));
 				}
 			}
 			else if (id.charAt(0) == 'R')
@@ -6067,7 +6288,14 @@ App.prototype.loadLibraries = function(libs, done)
 					{
 						if (files[i] != null)
 						{
-							this.loadLibrary(files[i], i <= idx);
+							try
+							{
+								this.loadLibrary(files[i], i <= idx);
+							}
+							catch (e)
+							{
+								// ignore
+							}
 						}
 					}
 				}
@@ -6401,8 +6629,11 @@ App.prototype.updateButtonContainer = function(skipNotifications)
 					this.userButton = document.createElement('a');
 					this.userButton.className = 'geButton geRoundButton';
 
-					// User avatar
-					var userImg = document.createElement('img');
+					// User avatar (a div using a background-image rather than an
+					// <img> so the default account icon adapts in dark mode via the
+					// same geAdaptiveAsset pattern as other toolbar icons — see #5364)
+					var userImg = document.createElement('div');
+					userImg.className = 'geUserAvatar';
 					this.userButton.appendChild(userImg);
 
 					mxEvent.addListener(this.userButton, 'click', mxUtils.bind(this, function(evt)
@@ -6430,8 +6661,8 @@ App.prototype.updateButtonContainer = function(skipNotifications)
 				if (!this.unloading)
 				{
 					// Updates user image
-					var userImg = this.userButton.getElementsByTagName('img')[0];
-					var syncImg = this.userButton.getElementsByTagName('img')[1];
+					var userImg = this.userButton.getElementsByClassName('geUserAvatar')[0];
+					var syncImg = this.userButton.getElementsByTagName('img')[0];
 					var title = mxResources.get('changeUser');
 					var user = this.getMainUser();
 
@@ -6443,14 +6674,16 @@ App.prototype.updateButtonContainer = function(skipNotifications)
 					if (user != null && user.pictureUrl != null)
 					{
 						userImg.classList.remove('geAdaptiveAsset');
-						userImg.src = user.pictureUrl;
+						userImg.classList.add('geUserPhoto');
+						userImg.style.backgroundImage = 'url(' + user.pictureUrl + ')';
 						syncImg.style.top = '3px';
 						syncImg.style.right = '0';
 					}
 					else
 					{
+						userImg.classList.remove('geUserPhoto');
 						userImg.classList.add('geAdaptiveAsset');
-						userImg.src = Editor.userImage;
+						userImg.style.backgroundImage = 'url(' + Editor.userImage + ')';
 						syncImg.style.top = '6px';
 						syncImg.style.right = '4px';
 					}
@@ -6584,6 +6817,15 @@ App.prototype.fetchAndShowNotification = function(target, subtarget)
 
 App.prototype.showNotification = function(notifs, lsReadFlag)
 {
+	// Keeps the last server notifications so locally-injected ones (e.g. app
+	// updates) can be merged in and survive a server-triggered re-render
+	this.lastNotifs = notifs;
+	this.lastNotifReadFlag = lsReadFlag;
+
+	notifs = (this.updateNotif != null) ?
+		[this.updateNotif].concat((notifs != null) ? notifs : []) :
+		((notifs != null) ? notifs : []);
+
 	var newCount = notifs.length;
 
 	if (Editor.currentTheme == 'min' || Editor.currentTheme == 'simple')
@@ -6637,7 +6879,7 @@ App.prototype.showNotification = function(notifs, lsReadFlag)
 			unread[i].className = 'circle';
 		}
 		
-		if (isLocalStorage && notifs[0])
+		if (isLocalStorage && lsReadFlag != null && notifs[0])
 		{
 			localStorage.setItem(lsReadFlag, notifs[0].timestamp);
 		}
@@ -6752,7 +6994,15 @@ App.prototype.showNotification = function(notifs, lsReadFlag)
 				notifEl.innerHTML = '<div class="circle' + (notif.isNew? ' active' : '') + '"></div><span class="time">' + 
 										mxUtils.htmlEntities(mxResources.get('timeAgo', [str], '{1} ago')) + '</span>' + 
 										'<p>' + mxUtils.htmlEntities(notif.content) + '</p>';
-				if (notif.link)
+				if (notif.funct)
+				{
+					mxEvent.addListener(notifEl, 'click', function()
+					{
+						editorUi.notificationWin.style.display = 'none';
+						notif.funct();
+					});
+				}
+				else if (notif.link)
 				{
 					mxEvent.addListener(notifEl, 'click', function()
 					{
@@ -7428,7 +7678,7 @@ App.prototype.convertFile = function(url, filename, mimeType, extension, success
 				    		else
 					    	{
 					    		// Workaround for character encoding issues in IE10/11
-					    		data = (window.atob && !mxClient.IS_IE && !mxClient.IS_IE11) ? atob(data) : Base64.decode(data);
+					    		data = (window.atob) ? atob(data) : Base64.decode(data);
 					    	}
 				    	}
 				    	
