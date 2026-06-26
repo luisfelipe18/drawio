@@ -470,7 +470,7 @@
 	 * Defines the strokewidth to be used for the outline rectangle
 	 * stroke width. Default is 3.
 	 */
-	OUTLINE_STROKEWIDTH: (mxClient.IS_IE) ? 2 : 3,
+	OUTLINE_STROKEWIDTH: 3,
 
 	/**
 	 * Variable: HANDLE_SIZE
@@ -1470,6 +1470,17 @@
 	STYLE_STARTSIZE: 'startSize',
 
 	/**
+	 * Variable: STYLE_FIXED_HEADER
+	 *
+	 * Defines the key for the fixedHeader style. If true, the swimlane header
+	 * is always rendered even when startSize is 0. If false, a startSize of 0
+	 * causes the shape to fall back to non-swimlane rendering (eg label bounds
+	 * from mxShape). Default is true for swimlanes, subclasses may override
+	 * via fixedHeaderDefault. Value is "fixedHeader".
+	 */
+	STYLE_FIXED_HEADER: 'fixedHeader',
+
+	/**
 	 * Variable: STYLE_SWIMLANE_LINE
 	 * 
 	 * Defines the key for the swimlaneLine style. This style specifies whether
@@ -1495,6 +1506,45 @@
 	 * (default) for visible. Value is "swimlaneBody".
 	 */
 	STYLE_SWIMLANE_BODY: 'swimlaneBody',
+
+	/**
+	 * Variable: STYLE_FOOTER_SIZE
+	 *
+	 * Defines the key for the footerSize style. This style specifies the size of
+	 * an additional filled, bordered region painted at the end of a swimlane
+	 * opposite the title (the "footer"), or at the bottom of a rectangle. Use 0
+	 * (default) for no footer. Value is "footerSize".
+	 */
+	STYLE_FOOTER_SIZE: 'footerSize',
+
+	/**
+	 * Variable: STYLE_FOOTER_COLOR
+	 *
+	 * Defines the key for the footerColor style. This style specifies the fill
+	 * color of the footer region of a rectangle (see <STYLE_FOOTER_SIZE>). If
+	 * not specified then the stroke color is used. Value is "footerColor".
+	 */
+	STYLE_FOOTER_COLOR: 'footerColor',
+
+	/**
+	 * Variable: STYLE_CENTER_RADIUS
+	 *
+	 * Defines the key for the centerRadius style. This style specifies the
+	 * radius of an additional filled circle painted at the center of an
+	 * ellipse, e.g. for UML final states. Use 0 (default) for no center
+	 * circle. Value is "centerRadius".
+	 */
+	STYLE_CENTER_RADIUS: 'centerRadius',
+
+	/**
+	 * Variable: STYLE_CENTER_COLOR
+	 *
+	 * Defines the key for the centerColor style. This style specifies the
+	 * fill color of the center circle of an ellipse (see
+	 * <STYLE_CENTER_RADIUS>). If not specified then the stroke color is
+	 * used. Value is "centerColor".
+	 */
+	STYLE_CENTER_COLOR: 'centerColor',
 
 	/**
 	 * Variable: STYLE_ENDFILL
@@ -1818,6 +1868,16 @@
 	 * <mxGraph.isCellFoldable>. Value is "foldable".
 	 */
 	STYLE_FOLDABLE: 'foldable',
+
+	/**
+	 * Variable: STYLE_GROUP_PADDING
+	 *
+	 * Defines the key for the groupPadding style. This specifies the padding
+	 * in pixels between the children of a group and the group bounds when
+	 * using extendParent or contractParent. Default is 0. Value is
+	 * "groupPadding".
+	 */
+	STYLE_GROUP_PADDING: 'groupPadding',
 
 	/**
 	 * Variable: STYLE_EDITABLE

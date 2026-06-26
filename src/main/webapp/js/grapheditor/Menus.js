@@ -423,7 +423,7 @@ Menus.prototype.init = function()
 			}));
 		}), parent);
 		menu.addSeparator(parent);
-		menu.addItem(mxResources.get('horizontalTree'), null, mxUtils.bind(this, function()
+		menu.addItem(mxResources.get('horizontalTree') + '...', null, mxUtils.bind(this, function()
 		{
 			var layout = new mxCompactTreeLayout(graph, true);
 			layout.edgeRouting = false;
@@ -439,7 +439,7 @@ Menus.prototype.init = function()
 				}
 			}));
 		}), parent);
-		menu.addItem(mxResources.get('verticalTree'), null, mxUtils.bind(this, function()
+		menu.addItem(mxResources.get('verticalTree') + '...', null, mxUtils.bind(this, function()
 		{
 			var layout = new mxCompactTreeLayout(graph, false);
 			layout.edgeRouting = false;
@@ -455,7 +455,7 @@ Menus.prototype.init = function()
 				}
 			}));
 		}), parent);
-		menu.addItem(mxResources.get('radialTree'), null, mxUtils.bind(this, function()
+		menu.addItem(mxResources.get('radialTree') + '...', null, mxUtils.bind(this, function()
 		{
 			var layout = new mxRadialTreeLayout(graph);
 			layout.levelDistance = 80;
@@ -471,57 +471,33 @@ Menus.prototype.init = function()
 			}));
 		}), parent);
 		menu.addSeparator(parent);
-		menu.addItem(mxResources.get('organic'), null, mxUtils.bind(this, function()
+		menu.addItem(mxResources.get('organic') + '...', null, mxUtils.bind(this, function()
 		{
 			var layout = new mxFastOrganicLayout(graph);
-			
+
 			promptSpacing(layout.forceConstant, mxUtils.bind(this, function(newValue)
 			{
 				this.editorUi.tryAndHandle(mxUtils.bind(this, function()
 				{
 					layout.forceConstant = newValue;
-					
+
 					this.editorUi.executeLayout(function()
 					{
 						var tmp = graph.getSelectionCell();
-						
+
 						if (tmp == null || graph.getModel().getChildCount(tmp) == 0)
 						{
 							tmp = graph.getDefaultParent();
 						}
-						
+
 						layout.execute(tmp);
-						
+
 						if (graph.getModel().isVertex(tmp))
 						{
 							graph.updateGroupBounds([tmp], graph.gridSize * 2, true);
 						}
 					}, true);
 				}));
-			}));
-		}), parent);
-		menu.addItem(mxResources.get('circle'), null, mxUtils.bind(this, function()
-		{
-			this.editorUi.tryAndHandle(mxUtils.bind(this, function()
-			{
-				var layout = new mxCircleLayout(graph);
-				
-				this.editorUi.executeLayout(function()
-				{
-					var tmp = graph.getSelectionCell();
-					
-					if (tmp == null || graph.getModel().getChildCount(tmp) == 0)
-					{
-						tmp = graph.getDefaultParent();
-					}
-					
-					layout.execute(tmp);
-					
-					if (graph.getModel().isVertex(tmp))
-					{
-						graph.updateGroupBounds([tmp], graph.gridSize * 2, true);
-					}
-				}, true);
 			}));
 		}), parent);
 	})));
@@ -540,7 +516,28 @@ Menus.prototype.init = function()
 		this.addSubmenu('navigation', menu, parent);
 		this.addSubmenu('insert', menu, parent);
 		this.addSubmenu('layout', menu, parent);
-		this.addMenuItems(menu, ['-', 'group', 'ungroup', 'removeFromGroup', '-', 'clearWaypoints', 'autosize'], parent);
+		this.addMenuItems(menu, ['-'], parent);
+
+		var groupItem = this.addMenuItem(menu, 'group', parent);
+
+		if (groupItem != null)
+		{
+			var help = this.editorUi.createHelpIcon(
+				'https://github.com/jgraph/drawio/discussions/5607');
+			help.style.display = 'inline-block';
+			help.style.verticalAlign = 'middle';
+			help.style.marginLeft = '6px';
+			var cells = groupItem.getElementsByTagName('td');
+
+			// Append to the label column (col2) so the icon sits immediately
+			// next to the "Group" label, not next to the shortcut in col3.
+			if (cells.length > 1)
+			{
+				cells[1].appendChild(help);
+			}
+		}
+
+		this.addMenuItems(menu, ['ungroup', 'removeFromGroup', '-', 'clearWaypoints', 'autosize'], parent);
 	}))).isEnabled = isGraphEnabled;
 	this.put('insert', new Menu(mxUtils.bind(this, function(menu, parent)
 	{
@@ -1087,12 +1084,17 @@ Menus.prototype.addInsertTableItem = function(menu, insertFn, parent, showOption
 	
 	if (showOptions)
 	{
-		elt2.firstChild.appendChild(titleOption);
-		elt2.firstChild.appendChild(titleLbl);
-		mxUtils.br(elt2.firstChild);
-		elt2.firstChild.appendChild(containerOption);
-		elt2.firstChild.appendChild(containerLbl);
-		mxUtils.br(elt2.firstChild);
+		var titleRow = document.createElement('div');
+		titleRow.style.marginBottom = '4px';
+		titleRow.appendChild(titleOption);
+		titleRow.appendChild(titleLbl);
+		elt2.firstChild.appendChild(titleRow);
+
+		var containerRow = document.createElement('div');
+		containerRow.style.marginBottom = '6px';
+		containerRow.appendChild(containerOption);
+		containerRow.appendChild(containerLbl);
+		elt2.firstChild.appendChild(containerRow);
 	}
 	
 	var picker = createPicker(5, 5);
@@ -1243,8 +1245,8 @@ Menus.prototype.edgeStyleChange = function(menu, label, keys, values, sprite, pa
 Menus.prototype.showIconOnly = function(elt)
 {
 	var td = elt.getElementsByTagName('td');
-	
-	for (i = 0; i < td.length; i++)
+
+	for (var i = 0; i < td.length; i++)
 	{
 		if (td[i].getAttribute('class') == 'mxPopupMenuItem')
 		{
@@ -1406,12 +1408,12 @@ Menus.prototype.promptChange = function(menu, label, hint, defaultValue, key, pa
 /**
  * Adds a handler for showing a menu in the given element.
  */
-Menus.prototype.pickColor = function(key, cmd, defaultValue, defaultColor, defaultColorValue, singleColorMode)
+Menus.prototype.pickColor = function(key, cmd, defaultValue, defaultColor, defaultColorValue, singleColorMode, title)
 {
 	this.editorUi.tryAndHandle(mxUtils.bind(this, function()
 	{
 		var graph = this.editorUi.editor.graph;
-		
+
 		if (cmd != null && graph.cellEditor.isContentEditing())
 		{
 			// Gets current foreground or background color
@@ -1431,22 +1433,21 @@ Menus.prototype.pickColor = function(key, cmd, defaultValue, defaultColor, defau
 								mxConstants.STYLE_LABEL_BACKGROUNDCOLOR], 'values', [color],
 							'cells', [graph.cellEditor.getEditingCell()]));
 					}
-				}), defaultColor, defaultColorValue, singleColorMode);
+				}), defaultColor, defaultColorValue, singleColorMode, title);
 			}
 		}
 		else
 		{
-			var style = graph.getCellStyle(graph.getSelectionCell(), false);
-			var color = mxConstants.NONE;
-			
-			if (style != null)
+			var getColorFn = function()
 			{
-				color = style[key] || color;
-			}
+				var style = graph.getCellStyle(graph.getSelectionCell(), false);
 
-			this.editorUi.pickColor(color, ColorDialog.createApplyFunction(
+				return (style != null) ? (style[key] || mxConstants.NONE) : mxConstants.NONE;
+			};
+
+			this.editorUi.pickColor(getColorFn(), ColorDialog.createApplyFunction(
 				this.editorUi, key), defaultColor, defaultColorValue,
-				singleColorMode);
+				singleColorMode, title, getColorFn);
 		}
 	}));
 };
@@ -1842,8 +1843,15 @@ Menus.prototype.createMenubar = function(container)
 			{
 				var elt = menubar.addMenu(mxResources.get(menus[i]), mxUtils.bind(this, function()
 				{
-					// Allows extensions of menu.funct
-					menu.funct.apply(this, arguments);
+					try
+					{
+						// Allows extensions of menu.funct
+						menu.funct.apply(this, arguments);
+					}
+					catch (e)
+					{
+						// ignore
+					}
 				}));
 				
 				this.menuCreated(menu, elt);

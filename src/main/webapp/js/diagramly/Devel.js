@@ -111,6 +111,7 @@ mxscript(geBasePath +'/Editor.js');
 mxscript(geBasePath +'/EditorUi.js');
 mxscript(geBasePath +'/Sidebar.js');
 mxscript(geBasePath +'/Graph.js');
+mxscript(geBasePath +'/InlineToolbar.js');
 mxscript(geBasePath +'/Format.js');
 mxscript(geBasePath +'/Shapes.js');
 mxscript(geBasePath +'/Actions.js');
@@ -156,6 +157,7 @@ mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-Flowchart.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-FluidPower.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-GCP.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-GCP2.js');
+mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-GCP3.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-GCPIcons.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-Gmdl.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-IBM.js');
@@ -202,6 +204,7 @@ mxscript(drawDevUrl + 'js/diagramly/EmbedFile.js');
 mxscript(drawDevUrl + 'js/diagramly/Dialogs.js');
 mxscript(drawDevUrl + 'js/diagramly/Editor.js');
 mxscript(drawDevUrl + 'js/diagramly/EditorUi.js');
+mxscript(drawDevUrl + 'js/diagramly/ConfigEditor.js');
 mxscript(drawDevUrl + 'js/diagramly/DiffSync.js');
 mxscript(drawDevUrl + 'js/diagramly/Settings.js');
 mxscript(drawDevUrl + 'js/diagramly/DrawioFilePolling.js');
@@ -252,7 +255,22 @@ if (!window.DRAWIO_PUBLIC_BUILD)
 	mxscript(drawDevUrl + 'js/diagramly/vsdx/VsdxExport.js');
 }
 
-mxscript(drawDevUrl + 'js/mermaid/mermaid2drawio.js');	
+// ELK layout engine + mxGraph bridge (drawio-elk port, built from
+// ../drawio-elk). Exposes window.ELK (engine), window.ElkLayout (facade
+// extending mxGraphLayout), window.ElkAdapter, window.ElkApplier.
+// Must load BEFORE ElkLayout.js (whose statics decorate ElkLayout) and
+// BEFORE drawio-mermaid (which picks ELK up via globalThis.ELK).
+mxscript(drawDevUrl + 'js/elk/drawio-elk.min.js');
+
+// ElkLayout editor bindings (run / runWithDialog / DIALOG_FIELDS /
+// localStorage settings). Decorates the bundled ElkLayout above with
+// the Arrange > Layout menu integration. drawio-elk doesn't ship these
+// because they're editor-only.
+mxscript(drawDevUrl + 'js/diagramly/ElkLayout.js');
+
+// Mermaid custom parser + cell factory + layout (single bundle built from
+// ../drawio-mermaid via esbuild). Uses window.ELK from drawio-elk above.
+mxscript(drawDevUrl + 'js/mermaid/drawio-mermaid.min.js');
 
 // Vsdx/vssx support
 mxscript(drawDevUrl + 'js/diagramly/emf/emf-svg.js');

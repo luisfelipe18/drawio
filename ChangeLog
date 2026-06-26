@@ -1,3 +1,772 @@
+19-JUN-2026: 30.2.5
+
+- fix(sidebar): pass title element to onInit in expanded addPalette path
+- feat(embed): optional mermaid group wrap on descriptor load
+- Fixes view jump on mouse wheel zoom [jgraph/drawio#5639]
+- Fixes off-center connection points on electrical stencils [jgraph/drawio#5627]
+- Fixes zoom-to-cursor jump when panning during a pending repaint [jgraph/drawio#5639]
+- Adds temporary flag-gated zoom debug logging [jgraph/drawio#5639]
+- Revert "Adds temporary flag-gated zoom debug logging [jgraph/drawio#5639]"
+- Sizes math export crop to rendered MathJax output [jgraph/drawio#5564]
+- Guard mxUtils.isVerticalTextDirection against non-string values
+- Fix desktop CLI Mermaid + ELK layout export
+- Fixes stored XSS on file open via editable=0
+
+18-JUN-2026: 30.2.4
+
+- Replaces mermaid in deployed version
+
+18-JUN-2026: 30.2.3
+
+- Improves generate response classification
+- Scopes GCP2 Zones markers style to closure (#5509)
+- Adds 90 degree rotation for fully unconnected edges [jgraph/drawio#5076]
+- Adds margin to rotate button in ArrangePanel
+- Removes logging for mermaid diagram parse errors
+- Replace static mermaid type lists with the parser's detectType
+- Wrap generated mermaid in an editable group in the chat
+- Show the chat response when it can't be rendered as a diagram
+- Update help icon link for mermaid in ParseDialog to point to GitHub discussion
+- Fix dark mode account icon visibility [jgraph/drawio#5364]
+- Updates DOMPurify from 3.4.9 to 3.4.10
+- Add best-effort recovery for files that fail to load
+- Fix dark mode account icon visibility [jgraph/drawio#5364]
+- Preserve format panel input focus across DOM refresh
+- Add automatic (transparentBounds) toggle and border width to Arrange panel
+- Corrections to security.md
+- Add Mermaid file open and ELK layout support for desktop
+- feat(shape): optional centerStroke border on ellipse center disc
+- Updates DOMPurify from 3.4.10 to 3.4.11
+- chore(mermaid): refresh vendored bundle to commit.4f618a5
+- fix(data): reject property names that are invalid XML attribute names
+- Copies orphaned static function into confluence [DID-19382]
+- Fixes shape library title overflow
+- fix(codec): log valid cell id on invalid style-compression reference
+- feat(config): add experimental compressStyles option
+
+12-JUN-2026: 30.2.2
+
+- Removes mermaid as a dependency
+- Updates to mermaid error handling
+- Guards against multiple success calls
+- FIlters out incorrect mermaid types from logging
+
+12-JUN-2026: 30.2.1
+
+- Correct ELK layout build
+- Adds defensive code in mermaid parsing
+- Removes debug output for electron app
+- Centralises isMermaidSupported()
+
+12-JUN-2026: 30.2.0
+
+- Adds more color flexibility to some Mockup and iOS shapes
+- Adds multicolor support to some iOS shapes
+- Adds multicolor supports to some IOS shapes
+- Adds multicolor support to some GMDL shapes
+- Adds multicolor support to some Mockup shapes
+- Adds multicolor support to some Android shapes
+- Adds multicolor support to soem EIP shapes
+- Adds multicolor support to some Rack shapes
+- Reduce days before stale from 250 to 200
+- Adds multicolor support to some GMDL shapes
+- refactor(text): unify HTML to SVG conversion and convertibility check in mxUtils [DID-18880]
+- fix(text): apply text colors in HTML to SVG label conversion
+- fix(handles): move edit icon from bottom-left to top edge
+- fix(handles): skip move icon in handle padding overlap detection
+- Updates DOMPurify from 3.4.8 to 3.4.9
+- Add custom mermaid parser with native layout engine
+- Improve mermaid output quality: font, sizing, ER columns, diamond shapes
+- Fix sequence fragment frames and improve layout quality
+- Fix gitgraph tags/branches, sequence activations, git commit shapes
+- Achieve 100% vertex and edge match across all 33 test examples
+- Switch to dagre (41KB) as default layout engine, matching mermaid
+- Calibrate horizontal padding to match mermaid node widths exactly
+- Add CoSE-Bilkent mindmap layout, compound dagre subgraphs, and sizing calibration
+- Fix flowchart style parsing, node ordering, edge routing, and default colors
+- Add flat layout mode for flowcharts with subgraph-to-subgraph edges
+- Use compound groups for all subgraphs, skip subgraph-endpoint edges in dagre
+- Use two-pass layout: flat dagre for global optimization, then group bounds
+- Fix edge cycle in subgraph remapping by using first leaf for source
+- Increase group padding for better edge spacing between subgraphs
+- Inflate leaf node sizes in flat dagre to prevent group overlap
+- Fix gitgraph orthogonal edges, label z-order, and label background
+- Add arrows to state diagram edges and clamp exit/entry points to [0,1]
+- Improve state diagram layout: bidirectional edge spread, source representative, and group centering
+- Fix cross-axis mirror to operate per connected component
+- Sort journey actor legend alphabetically to match legacy
+- Add ELK subgraph test case from jgraph/drawio#3634
+- Rewrite native ELK compound layout to use flat approach
+- Switch native ELK to hierarchical layout with disconnected components
+- Improve native ELK layout quality: spacing, edge dedup, isolated nodes
+- Add crossing count evaluation and 2-opt refinement to Sugiyama
+- Improve Sugiyama edge routing and coordinate assignment
+- Add edge routing channels and slot-based bend point spreading
+- Implement ELK-style bus merging and edge routing channels
+- Add chain alignment and tighter internal compound spacing
+- Fix bus routing for deduplicated edges and add section copying
+- Preserve ELK edge routing for compound node edges in cell factory
+- Elk layout improvements
+- Elk improvements
+- Gitgraph rendering: match upstream mermaid output
+- Use .drawio extension for mermaid output diagrams
+- Class diagram rendering: match upstream mermaid output
+- Class edge label styling: match upstream mermaid
+- Flowchart rendering: match upstream mermaid output
+- ER diagram rendering: match upstream mermaid output
+- Flowchart rendering: match upstream mermaid edge labels, subgraph padding, shape sizes
+- State diagram rendering: match upstream mermaid output
+- Mindmap rendering: match upstream mermaid output
+- Sequence diagram rendering: match upstream mermaid output
+- Journey diagram rendering: match upstream mermaid output
+- Mermaid parser coverage plan and per-iteration loop prompt
+- Pie chart rendering: native parser matching upstream mermaid output
+- Packet diagram rendering: native parser matching upstream mermaid output
+- Chart types batch: quadrantChart, timeline, kanban, xychart, radar, block
+- Chart types batch: c4, architecture, sankey, treemap, gantt, zenuml, venn, ishikawa
+- TreeView diagram rendering: final TODO row — all 26 types supported
+- Extract mermaid port to ../drawio-mermaid, consume as single bundle
+- Refactors theme submenu addition logic for better readability and maintainability
+- Adds realtime checksum debugging documentation to CLAUDE.md
+- Add ELK layout bridge (Phase 1 + Phase 2 complete)
+- Wire ELK Layered bridge into draw.io UI with mermaid-parity fixes
+- Register ELK layouts in Arrange menu and tune label spacing
+- Ignore ELK harness runtime artifacts
+- Refactor ElkLayout execution flow to support asynchronous layout preparation and improve error handling
+- Refactor code structure for improved readability and maintainability
+- Update drawio-mermaid bundle: elkjs + block/c4/class layout fixes
+- Add lockedGroup cell style for mermaid subgraph wrappers
+- Add side-by-side ELK engine comparison in Arrange > Layout
+- ElkLayout: improve label snap + fan-in edge endpoints
+- ElkLayout: map verticalAlign=top/bottom to INSIDE label placement
+- ElkLayout: widen edge-node jetty + propagate spacing to compounds
+- Unbundle ELK from mermaid + add Edge Routing menu
+- Add drawio-elk and drawio-mermaid as submodules under modules/
+- Load drawio-elk before drawio-mermaid in production and export paths
+- Add bundles Ant target to rebuild from modules/
+- Prepare mermaid.min.js removal: flag, instrumentation, kill-switch
+- Document modules/ submodules, bundles target, and native-mermaid flag
+- Pin modules/drawio-mermaid to own-elk branch (5480c1c)
+- Track drawio-mermaid on dev after own-elk squash-merge
+- Refresh drawio-mermaid bundle from dev (fea8fbf)
+- Refresh docs and submodule pointers for the native-ports work
+- Build of version 29.7.2
+- Inline configuration editor into dialog instead of iframe
+- Refactors ELK layout menu integration and adds submenu for layout options
+- Pass mermaid config to native parser so theme is honored
+- Refresh drawio-elk + drawio-mermaid bundles with version banner
+- Repoint drawio-mermaid submodule to a reachable commit
+- Removed incorrect gitlinks added for submodules
+- Refresh drawio-mermaid bundle from dev (625a80e)
+- Switch native-port build to sibling-repo layout
+- Restore mermaid2drawio.js to track dev branch
+- Refresh drawio-mermaid bundle from dev (5dfcee9)
+- Refresh drawio-mermaid bundle from dev (4199dfd)
+- Refresh drawio-mermaid bundle from dev (f4786c4)
+- feat(mermaid): apply ElkLayout post-pass for flowchart-elk
+- Replaces diagramly source in GAE release
+- feat(elk): mermaidPolicy on the loadMermaid post-pass
+- feat(elk): default mermaidPolicy for layered, including the menu
+- chore(mermaid): resync drawio-mermaid.min.js for subroutine label slack
+- chore(mermaid): resync drawio-mermaid.min.js for rounded shape pad bump
+- chore(mermaid): resync drawio-mermaid.min.js for layout fixes
+- chore(mermaid): resync drawio-mermaid.min.js for parser-based edge length fix
+- chore(mermaid): resync drawio-mermaid.min.js for arrow size shrink
+- chore(mermaid): drop MindmapCloudShape, resync drawio-mermaid.min.js
+- Adds config dialogs to ELK layout submenu
+- Adds seq* shapes for native mermaid sequence-diagram actor types
+- Fixes seq* actor-type icon rendering in sequence diagrams
+- Restructures Layout menu around ELK with edge-style options
+- Replaces mermaid insert/edit with native parser, drops legacy bridge
+- Fix SeqBoundaryShape circle alignment on lifeline and SeqQueueShape paintForeground translate accumulation
+- Fixes mermaid edit on locked group by reading layer children instead of a non-existent wrapper vertex
+- Preserve user style/label customizations across mermaid locked-group regenerations
+- Refresh drawio-mermaid.min.js with identity-tagging bundle
+- chore(mermaid): resync drawio-mermaid.min.js for state bidi + sequence frame fixes
+- Consolidate ElkLayout into the drawio-elk bundle
+- Refresh drawio-elk.min.js with isolated top-level + keep-mode orthogonal
+- Refresh drawio-elk bundle with cross-scope + clamp fixes
+- Add Preserve Origin option to ELK layout dialog
+- ELK layout: collapse routing/style into one Connector dropdown
+- Clear default Mermaid config so imports use Mermaid's own defaults
+- Wraps Mermaid output in an editable group, drops Editable insert flag
+- Preserves Mermaid group position on edit re-parse
+- Add ELK layouts to custom layout dialog and CSV import
+- Scope CSV-import layouts to the imported cells
+- Fix CSV-import ELK layout: undo, free insert point, edge scope
+- Refines CSV layout documentation and updates ELK layout configurations for clarity
+- Marks WebCola plugin deprecated in favor of ELK layouts
+- Tunes CSV verticalflow/horizontalflow ELK config to match mxHierarchicalLayout
+- Refresh drawio-mermaid bundle (container-aware group wrapping)
+- Re-vendor drawio-mermaid + drawio-elk bundles
+- vendor: update drawio-elk bundle to 4ad207d (bug-audit fixes)
+- Refresh drawio-mermaid bundle (6add5f0)
+- Refresh drawio-mermaid and drawio-elk bundles
+- refactor(elk): drive all layout routes through the ElkLayout facade
+- fix(elk): preserve transparentBounds group origin on layout
+- fix(mermaid): don't preserve layout routing as a user edit on re-parse
+- fix(elk): pin transparentBounds groups at (0,0); thin editor wrapper
+- fix(mermaid): vendor native composite-state direction fix
+- fix(mermaid): use legacy config when migrating shape=image cells
+- feat(mermaid): add mermaidSankeyLink ribbon edge shape
+- feat(shapes): conditional labelBounds for stencils via boundedLbl
+- fix(layout): omit negative stress iteration limit so -1 means no cap
+- feat(layout): add help links to the layout config dialogs
+- Removes upstream mermaid.min.js, native parser is the only path
+- Moves the tree subtree drag handle to the top-left move icon
+- Adds footerSize and footerColor styles to rectangles
+- Moves the bundles target from github-build.xml to build.xml
+- vendor: update mermaid (f115fed) and elk (df6c57b) bundles
+- Restores exact pre-linearization tree state
+- vendor: update elk (e8ef0e0) and mermaid (ebea636) bundles
+- Adds centerRadius and centerColor styles to ellipses
+
+05-JUN-2026: 30.1.2
+
+- feat(transparentBounds): read-only derived geometry, reset on enable
+- Move DIALOG_STYLE_GUIDE.md to docs/dialog-style-guide.md
+- feat(appUpdate): notify of available update via notification bell
+- feat(exportDialog): Advanced section for per-format export dialogs
+- feat(pageSetup): per-page initial view (Use Current / Reset)
+- fix(sketch): resolve light-dark fill to current mode for fillStyle=auto
+- Updates DOMPurify from 3.4.7 to 3.4.8
+- Adds support for notion.com domain
+- fix(pageSetup): full-width initial-view buttons + label tooltips
+- fix(transparentBounds): always create group corner handles on refresh
+- Updates release process for notion extension
+- fix(custom-actions): restore model-mutating toggle/show/hide for custom-link clicks [DID-19248]
+
+02-JUN-2026: 30.1.1
+
+- Extends generate timeout to 90s
+- refactor(swimlane): rename chinSize style to footerSize
+
+02-JUN-2026: 30.1.0
+
+- Build of version 30.0.4
+- Adds transparentBounds groups, moveIcon, connectIcon, groupPadding shorthand
+- Adds step-based animations and custom actions
+- Fixes empty paste element in pasteCells text/plain branch
+- Fixes XML pasted as text when Ctrl is held through copy/paste
+- Adds immediate flag for parallel animation steps and customAction window persistence
+- Fixes transparentBounds bounds and group/toggle integration
+- Updates DOMPurify from 3.4.5 to 3.4.7
+- Fixes pattern fill loss on later PDF pages [jgraph/drawio#5578]
+- Fixes transparentBounds bounds and group/toggle integration
+- Adds multi-edge / multi-corner resize to mxWindow and Dialog
+- Changes default groupPadding for transparentBounds to 0 [jgraph/drawio#5607]
+- Fixes overlapping corner icons on nested transparentBounds groups
+- Adds selection padding and corner handles for nested transparentBounds groups
+- Moves svgdata plugin behavior into core SVG export
+- Inlines built-in plugin dropdown in PluginsDialog
+- Moves Edit/Layers/Tags into collapsible Advanced section in publish/embed/export dialogs
+- Routes dialog help icons to the new GitHub Discussions
+- Routes Embed/Export HTML help icons to the merged docs page
+- Collapses redundant transparentBounds wrapper after sibling removal
+- Pins dialog buttons and scrolls content when dialog exceeds viewport
+- Defers sidebar thumb rendering until scrolled into view [jgraph/drawio-desktop#2444]
+- Fixes mxMorphing animating transparentBounds cells
+- Fix rubberband selecting page text when Cmd/Ctrl held on macOS
+- Fix Safari scrolling the canvas to top-left on Cmd/Ctrl+click
+- Fix paste swallowed after Cmd/Ctrl+rubberband when a cell was pre-selected
+- Fix color picker window restoring to wrong empty size when reopened collapsed
+- Fixes paste/crop/insert mis-positioning of transparentBounds groups
+- Fixes stale edge routing when a transparentBounds child moves
+- Fixes autosize/layout corrupting transparentBounds group geometry
+- Fixes Align/Distribute on transparentBounds groups
+- Fixes childLayout collapsing/corrupting a transparentBounds parent
+- Fixes collapse corrupting transparentBounds group geometry
+- Fixes transparentBounds derived bounds ignoring edge children
+- Add Collapse All / Expand All to sidebar section context menu
+- Fixes opening CLI-exported PNGs with a zlib-compressed embedded diagram
+- Add JSON export of diagram structure and metadata
+- Condenses CLAUDE.md
+- Fixes color picker opening behind modal dialogs (e.g. Page Setup background)
+- Fixes line height change affecting elements outside the cell editor
+- feat(swimlane): configurable chin (chinSize) on mxSwimlane
+
+27-MAY-2026: 30.0.4
+
+- Adds GCP3 to build
+- Build of version 30.0.4
+
+27-MAY-2026: 30.0.4
+
+
+
+26-MAY-2026: 30.0.3
+
+- Test Cloud Build trigger
+- Test Cloud Build trigger
+- Upgrades to JDK 21
+- Adds new GCP3 stencils. Preliminary version, content added, but many things to fix.
+- Adds new GCP3 stencils to the sidebar
+- Adds pointerEvents=1 style to GCP3 stencils and changes labels to a more conventional format
+- Adds multicolor support to some iOS7 stencils
+- Adds more multicolor options for some Rack stencils
+- Removes duplicate entry
+- Removes quotes from bool
+- Adds vertical text check to wrapping check [DID-18880]
+- Updates DOMPurify from 3.4.2 to 3.4.5
+- Adds lockedGroupIcon, editIcon styles and lock/edit handles
+- Adjusts footer position in Notion dialog to improve layout
+- Adds editPolygon option in edit menu
+- Adds line breaks for dev tooltips
+- Blocks drops and child drags inside locked groups
+- Pads lock and edit icon handles like the rotation handle
+- Adds multicolor support for IBM stencils
+- Adds multicolor support for Atlassian stencils
+- Refactors an Azure stencil, so it's in line with the others in the set
+- Adds multicolor support for a Bootstrap stencil
+- Adds multicolor support for EIP stencils
+- Adds multicolor support for a Flowchart stencil
+- Adds multicolor support for VVD stencils
+- Adds multicolor support for some Android stencils
+- Promote text and anonymize plugins to core functionality
+
+15-MAY-2026: 30.0.2
+
+- Makes some Mockup shapes multi-color flexible
+- Makes some MSCAE shapes multi-color flexible
+- Makes some Salesforce shapes multi-color flexible
+- Small fix for a Network 2025 shape
+- Small bugfix for some Mockup shapes
+- Additional color flexibility for some Cisco Safe shapes
+- Adds multi color fill for some Citrix stencils
+- Adds multi-color support for some GCP2 shapes and stencils
+- Adds multi-color support for GCP2 shapes and stencils
+- Adds multi-color support for a GCP2 icon stencil
+- Adds multi-color support for MS Office stencils
+- Fixes size for some stencils in the Rack library
+- Adds multi-color support for some Rack stencils
+- Makes HPE Aruba Gateways and Controllers subgroup in Rack shapes color flexible
+- Makes HPE Aruba Security subgroup in Rack shapes color flexible
+- Makes part of HPE Aruba Switches subgroup in Rack shapes color flexible
+- Makes some Rack stencils color flexible
+- Makes some Rack stencils color flexible
+- Makes the rest of Rack/Aruba stencils color flexible
+- Small fix for an Aruba switch stencil
+- Makes Rack/IBM stencils color flexible
+- Stencil size fix for a Rack stencil
+- Makes Rack/Oracle stencils color flexible
+- Adds multicolor support to Veeam stencils
+- Adds multicolor support to EIP stencils
+- Adds multicolor support to some GMDL stencils
+- Adds multicolor support to some Floorplan stencils
+- Fixed NPE in mermaid to draw.io [#drawio-5553]
+- Fallback to FO when vertical writing-mode set in HTML [DID-18880]
+- Updated github actions, replaced 3rd party actions, and specified needed permissions
+- Build of version 30.0.2
+
+15-MAY-2026: 30.0.2
+
+- Makes some Mockup shapes multi-color flexible
+- Makes some MSCAE shapes multi-color flexible
+- Makes some Salesforce shapes multi-color flexible
+- Small fix for a Network 2025 shape
+- Small bugfix for some Mockup shapes
+- Additional color flexibility for some Cisco Safe shapes
+- Adds multi color fill for some Citrix stencils
+- Adds multi-color support for some GCP2 shapes and stencils
+- Adds multi-color support for GCP2 shapes and stencils
+- Adds multi-color support for a GCP2 icon stencil
+- Adds multi-color support for MS Office stencils
+- Fixes size for some stencils in the Rack library
+- Adds multi-color support for some Rack stencils
+- Makes HPE Aruba Gateways and Controllers subgroup in Rack shapes color flexible
+- Makes HPE Aruba Security subgroup in Rack shapes color flexible
+- Makes part of HPE Aruba Switches subgroup in Rack shapes color flexible
+- Makes some Rack stencils color flexible
+- Makes some Rack stencils color flexible
+- Makes the rest of Rack/Aruba stencils color flexible
+- Small fix for an Aruba switch stencil
+- Makes Rack/IBM stencils color flexible
+- Stencil size fix for a Rack stencil
+- Makes Rack/Oracle stencils color flexible
+- Adds multicolor support to Veeam stencils
+- Adds multicolor support to EIP stencils
+- Adds multicolor support to some GMDL stencils
+- Adds multicolor support to some Floorplan stencils
+- Fixed NPE in mermaid to draw.io [#drawio-5553]
+- Fallback to FO when vertical writing-mode set in HTML [DID-18880]
+- Updated github actions, replaced 3rd party actions, and specified needed permissions
+
+11-MAY-2026: 30.0.1
+
+- Corrects rounded of Archimate Techonology Functions shape [jgraph/drawio#5571]
+- ci: fix MCP index trigger tag pattern
+- Shows up to 4 matching pages in omnisearch dropdown
+
+09-MAY-2026: 30.0.0
+
+- Uses cached sanitized label for SVG support detection
+- Updates DOMPurify from 3.4.0 to 3.4.2
+- Persists minimized state of floating windows
+- Moves adaptive colors to page setup, adds page setup in simple+min UI
+- Adds mermaid shapes from native-ports branch
+- Sizes math labels and view to rendered MathJax output [jgraph/drawio#3311]
+- Fixes math fit-to-window on page switch with sync MathJax typeset
+- Adds configurable tooltipFontSize and tooltipMaxWidth
+- Adds lockedGroup cell style for grouping cells as one image
+- Adds Mindmap Bang, Git Tag, and Smiley Faces in Basic sidebar
+- Fixes dropped initialText in cellEditor.startEditing override
+- Fixes tab scroller jumping left when switching from rightmost page
+- Keeps inline toolbar and popovers inside visible viewport
+- Fixed Lucid import chrome extension
+- Skips empty drafts on save and cleans up existing ones on startup
+- Default adaptive colours no longer simple in desktop
+
+05-MAY-2026: 29.7.12
+
+- Adds boundedLbl for manual input shape
+- Removes quip references
+- Adds label sanitize https://github.com/jgraph/docker-drawio/security/advisories/GHSA-wj8x-4c77-v8v3
+
+04-MAY-2026: 29.7.11
+
+- Upgrades to JDK 21
+- Fixes offline local shape search pagination [jgraph/drawio-desktop#2409]
+- Updated mermaid to v11.14.0
+- Fixes NPE in insertTableRow on empty table; inserts initial row with single column
+- Disables insert column buttons in Format panel for empty tables
+- Updates MathJax from 4.1.1 to 4.1.2
+- Replaces diagramly source in GAE release
+
+01-MAY-2026: 29.7.10
+
+- Fixed lightbox mode for MS360 files
+- Conf Cloud: Added configuration editor
+- Added Confluence specific configurations to config-editor
+- Inline configuration editor into dialog instead of iframe
+- Update i18n submodule with normalized English capitalization
+- Add missed lineend/linestart capitalization in i18n submodule
+- Remove unused hateApp/loveIt keys and expand procEng in i18n submodule
+- Expand Proc. Eng. abbreviation in PID sidebar and i18n submodule
+- Fixes page format options vertical alignment
+- Fixes print dialog inconsistencies
+- Fixes inconsistent sections in Format panel
+- Adds rounding for arrow handle values
+- Fixes inconsistent padding for Format sections
+- Adds glass style support for ellipse and rhombus shapes
+- Show style tiles for mixed selections including edge labels
+- Fixes fill pattern issues with crop print and color leak [jgraph/drawio#5546]
+- Adjusts padding for edge geometry and stroke panels for improved layout
+- Fixes ignored current dark mode in config editor
+- Replaces rounded button with checkbox in diagram style panel
+- Restyles file properties dialog using dialog style guide
+- Restyles font dialog using dialog style guide
+- Saving embed macro preview with the actual diagram [DID-18496]
+- Recovers broken desktop saved PDFs jgraph/drawio-desktop#2394]
+- Removed incorrect gitlinks added for submodules
+
+20-APR-2026: 29.7.9
+
+- Skip clipboard init in read-only chromeless EditorUi
+- Restricts third-party gitlab integrations without config [DID-18566]
+
+17-APR-2026: 29.7.8
+
+- Fixes NPE in mxEdgeHandler.reset when handle reset triggers destroy
+- Fixes NPE in mxCellRenderer.insertStateAfter when node is orphaned
+- Fixes NPE in mxWindow.setLocation when window is destroyed during drag
+- Fixes NPE in mxVertexHandler.start when handle shapes are not created
+- Fixes NPE in EditorUi.diffPages when pages array contains null entries
+- Fixes NPE in EmbedFile.isAutosaveOptional when desc is null
+- Add defensive settings check in restoreVisibleWindows
+
+14-APR-2026: 29.7.7
+
+- Creates default viewState in patchViewState when null
+- Fix null crashes in HoverIcons and mxConstraintHandler during mouse events
+- Handle atob error in noFile fallback when error dialog is dismissed
+- Fix null crash in PolygonDialog drag when points array is modified
+- Exclude InvalidCharacterError from mergeFile error logging
+- Guard against non-function success callback in DriveFile.saveFile
+- Fix mxObjectCodec mapping default picking up Array.prototype methods
+- Persist size of modal resizable edit/insert dialogs
+- Guard pasteCellStyles split against non-string cell styles
+- Guard mxSvgCanvas2D.setCssText against non-Element nodes
+- Guard mxUtils.setStyleFlag against non-string style values
+- Add configurable foldingIconSize for collapse/expand icons
+- Enable collapse/expand actions for multi-selection [DID-18161]
+- Guard EditorUi.highlightElement against null document.body
+- Guard Sidebar.addEntry against non-string tags values
+- Skip null-geometry cells in Graph.visitTableCells
+- Guard Minimal.js hideCurrentMenu override against null editor
+- Guard Sidebar.addCustomEntries against missing entry.libs
+- Guard Dialog constructor against null document.body
+- Guard updateShapes split against non-string cell styles
+- Declare loop variable in Menus.showIconOnly
+- Fix diffViewState null asymmetry causing checksum errors in mergeFile
+- Persist Selection Only state in export dialogs within session
+- Updates DOMPurify from 3.3.3 to 3.4.0
+- Fixes link dialog layout in confluence connect
+
+12-APR-2026: 29.7.6
+
+- Thinner inline toolbar icons and toggle popover on click
+- Shows inline toolbar popover above when below viewport
+- Fix InlineToolbar ReferenceError in viewer builds
+- Disables server logging for handled errors in handleError
+- Excludes "Invalid or unexpected token" SyntaxError from server log
+- Use specific color dialog titles instead of panel labels
+- Move InlineToolbar creation override to InlineToolbar.js
+
+12-APR-2026: 29.7.5
+
+- Fixes URL hash update when switching pages in presentation mode
+- Refactors theme submenu addition logic for better readability and maintainability
+- Increases minimum width for shape window to improve layout consistency
+- Fixes null reference errors in TableLayout, updateTabContainer, and ColorDialog
+- A workaround for multipart doesn't support non ascii characters in diagram save comments
+- Adds try-catch for image metadata stripping to handle malformed chunks
+- Adds realtime checksum debugging documentation to CLAUDE.md
+- Fixes null geometry in TableLayout.execute
+- Fixes TypeError in EmbedFile.getTitle when descriptor is null
+- Fixes JSON.parse error in loadLibraries when external library returns invalid content
+- Handle corrupt page data in getPagesForXml without aborting
+- Handles corrupted data errors in async pickFolder callbacks
+- Extract InlineToolbar into separate InlineToolbar.js file
+- Fixes edge color button in InlineToolbar to pass default color and show diagonal light-dark swatch
+- Hides inline toolbar when edge color picker is opened
+- Hides inline toolbar when edge color is picked or color picker is closed
+- Adds arrow key navigation for sidebar search dropdown
+- Excludes errors from blob: URLs in client error logging
+- Excludes strict mode errors from extensions.min.js in client error logging
+- Adds error handling for JSON.parse of create hash parameter in loadFile
+- Adds error handling for menu factory in createMenubar
+- Logs decodeChild errors to console instead of throwing
+- Logs duplicate ID errors to console instead of throwing in putObject
+- Adds null check for geometry in mxGraphHandler.start
+- Fixes infinite loop in wedgeArrowDashed2 when stepSize is 0
+- Adds null check for bounds in fitDiagramToWindow
+
+10-APR-2026: 29.7.4
+
+- Fixes Sidebar.destroy NPE by destroying sidebar before editor
+- Fixes TypeError in updateEdgeState for invalid geometry objects
+- Fixes TypeError in mxOutline.getViewBox after destroy
+- Fixes TypeError in mxUtils.setStyle for non-string style values
+- Refactors link overlay click handling to support custom links and improve link opening logic
+- Uses page dropdown with chevronDown in presentation mode toolbar
+- Fixes TypeError in refreshBrowserTranslateMirror for destroyed graph
+- Fixes TypeError in keydown/keyup handlers for null graph container
+- Fixes TypeError in windowResized for destroyed EditorUi
+- Fixes TypeError in mxGeometry.equals for non-mxPoint offset objects
+- Fixes TypeError in EmbedFile.getDescriptorRevisionId for null descriptor
+- Fixes TypeError in mxPolyline.redraw for null node in updatePageBreaks
+- Fixes possible NPE in mxCellState.clone
+- Fixes possible NPE
+- Adds error handling for corrupted data in dialog save actions
+- Fixes TypeError in pasteCellStyles for non-string cell style
+- Fixes paste style not removing default styles from target [jgraph/drawio-desktop#2383]
+- Revert "Fixes encoding for connect attachments comments"
+
+09-APR-2026: 29.7.3
+
+- Changes to dashboard URL
+- ci: trigger drawio-mcp search index update on new version tags
+- Adds null check for callback in showExportDialog
+- Adds null check for setTerminalPoint in cellsRemoved and disconnectGraph
+- Fix URIError in StyleFormatPanel.addProperties for malformed style values
+- Adds null check for equals in processChange for mxGeometryChange
+- Fixes TypeError in addPaletteFunctions by protecting createVertexTemplateFromCells restore in addEntry
+- Adds presentation mode for desktop using fullscreen DIV overlay
+- Jira Cloud: Fixed a bug in Confluence search [DID-18214]
+- Jira Conf: Added support for Forge diagrams in Confluence embed [DID-18214]
+- Fix checksum errors from external tools adding extra diagram attributes
+
+09-APR-2026: 29.7.2
+
+- Prefers non-current page in omni search results
+- Moves copy/paste text style from edit dropdown to text format panel buttons
+- Adds page actions for omnibox access and reuses them in page tab menus
+- Restores geUrlLinkContainer class on link dialog URL row for Confluence plugin
+- Adds adaptiveColors to viewStateProperties for diff sync
+- Fixes NPE in page tab drag when requestAnimationFrame fires after dragend
+- Fixes NPE in table color picker when selection changes during async callback
+- Fixes stroke color condition typo and non-string style in color scheme panel
+- Adds error handling for corrupted data in Graph.decompress
+- Adds error handling for corrupted draft data in DraftDialog
+- Exposes urlInput property on LinkDialog for stable access from plugins
+- Prevents showing sparkle button in simple theme if generate action is null
+
+08-APR-2026: 29.7.1
+
+- Jira Cloud: Fixed Confluence auth in embed [DID-18214]
+
+08-APR-2026: 29.7.0
+
+- Fixes dashboard URL
+- Fixes possible NPE for invalid shape picker configuration
+- Adds experimental curved text shape in Misc sidebar [jgraph/drawio#2651]
+- feat: improve shape search with scored fallback and compound token splitting
+- Redesigned edit data dialog
+- Redesigned edit geometry dialog
+- Redesigned page setup dialog
+- Redesigned page background dialog
+- Redesigned edit link dialog
+- Update dialog style guide
+- Redesigned edit library dialog and added resizing
+- Redesigned edit diagram dialog
+- Redesigned parse dialog
+- Redesigned create graph dialog
+- Redesigned plugins dialog
+- Redesigned text dialog
+- Redesigned simple text dialog
+- Makes text dialog resizable
+- Adds ms365 to proxy list
+- Redesigned insert table drop down
+- Persists sidebar width across page reloads
+- Persists format panel collapsed section states across page reloads
+- Persists sidebar library collapsed states across page reloads
+- Adds pop animation when inserting single vertices from sidebar via click
+- Shortens insert animation and defers selection until it completes
+- Adds drag-and-drop reordering of sidebar library entries with persistence
+- Convert color picker from modal dialog to non-modal tool window
+- Fixes mxWindow title accumulation when browser translation is active
+- Adds persistence for window positions, sizes, docking states and visibility
+- Fixes layers window disabled state and tool windows not showing on first click
+- Fixes recent colors duplication after reset in color picker
+- Adds shift+click on tag eye icon to show only that tag
+- Adds browserTranslate configuration switch and documentation
+- Adds experimental support for browser translation
+- Adds browser translation support to GraphViewer and changes default to enabled
+- Adds spacer placeholder for page tab drag reorder
+- Fixes tab scroller jumping on page activation
+- Lazy browser translate init, default on in viewer, same-origin iframe support
+- Fixes default color button missing in color picker tool window
+- Adjusts animation delay in itemClicked function for faster transitions
+- Fixes typing shim stealing focus from clipboard handler during copy/paste
+- Adds Ctrl/Cmd+Enter shortcut to omnisearch dropdown for first entry after separator
+- Fixes clipped SVG borders in clipSvgDataUri [jgraph/drawio#5534]
+- Fixes stencil connection points with direction and aspect=fixed [jgraph/drawio#5537]
+- Fixes stencil edge routing bounds with direction and self-loop state corruption [jgraph/drawio#5537]
+- Improved localized shape search using fast, local reverse lookup for available resources [jgraph/drawio#5518]
+- Adds copy/paste text style feature [jgraph/drawio#4752]
+- Adds rounded border support for image shapes
+- Fixes Find/Replace window not showing on first invocation from omni search
+- Adds exact page name match in omni search when query ends with space
+- Removes enableAi hard coded to true in conf connect plugin
+- Defaults enableAi to false for new Confluence installs
+
+02-APR-2026: 29.6.10
+
+- Fixes build dashboard URL
+- Fixes selection only option in print dialog for single page files [jgraph/drawio#5530]
+- Remove unused GraphViewer.mergeXmlDelta and helper functions
+- Adds pop effect easter egg to create hash property
+- Add collapsible sections to format panel
+- Increase sidebar padding and spacing for lighter feel
+- Increase sidebar padding and spacing for lighter feel
+- Enhance More Shapes dialog with new styles and layout adjustments
+- Improve More Shapes dialog footer spacing and alignment
+
+01-APR-2026: 29.6.9
+
+- Adds elastic pop animation and popIn/popOut custom link actions
+- fix: skip spacebar panning when focus is in a form element [jgraph/drawio#5529]
+
+31-MAR-2026: 29.6.8
+
+- Adds GraphViewer.mergeXmlDelta
+- Fixes dy is not defined in EditorUi.showPublishLinkDialog
+- Fixes TypeError in translateCell for invalid geometry objects
+- Fixes TypeError in GraphViewer hiddenTags when diagrams is undefined
+
+31-MAR-2026: 29.6.7
+
+- Adds compressed XML support for SVG CLI export [jgraph/drawio-desktop#2143]
+- Fixes rasterized fill patterns in PDF export [jgraph/drawio#3620]
+- Enhance SVG text rendering by adding support for block elements and improving HTML to SVG conversion
+- Add .claude/launch.json to .gitignore
+- Enhance HTML to SVG conversion by adding word wrap and HTML tags
+- Updates DOMPurify from 3.3.2 to 3.3.3
+- Add BR support to HTML-to-SVG conversion and fix wrapped line heights
+- Fixes inconsistent table row and column resizing
+- feat: add configuration editor dialog with tabbed interface for visual editor and JSON
+- docs: add guidance for updating configuration switches in Editor.configure
+- feat: Enhance SVG conversion for HTML blocks and inline elements
+- fix: Improve dy calculations for superscripts and subscripts in SVG rendering
+- fix: Hide inline toolbar during all handle and cell drag operations
+- Fixes inconsistent file open handling
+- fix: Use whiteSpace instead of svgWhiteSpace when foreignObject is used
+- fix: Correct typo in ChangeLog for animated gif export
+- Add "Use Current" buttons for default styles in config editor
+- fix: Update redrawInnerBends to handle empty geometry points for bends opacity
+- fix: Auto-detect Android tablets in Chrome's desktop UA mode [jgraph/drawio#2090]
+- Enables Generate dialog with clipboard actions in desktop app
+- feat: add setInnerBendsOpacity function to manage inner bends opacity
+- feat: add optional optimizeHtmlLabels config to clean up HTML labels [jgraph/drawio#5516]
+- feat: Add "Search Shapes in Open Libraries" to omni search [jgraph/drawio-desktop#2320]
+- Update resources submodule with translations for searchShapesInOpenLibraries
+- fix: round text y-coordinates to 2 decimals in HTML-to-SVG label conversion
+- Update resources submodule with translation fixes across 15 languages
+- perf: reuse persistent div in getSizeForString to avoid repeated DOM reflows
+- refactor: remove unused enableWrap parameter from mxText.updateSize
+- refactor: remove IE8 dead code from mxText
+- refactor: remove IE and IE11 dead code across entire codebase
+- Update resources submodule with removed unused improveContrast key
+- feat: make default file type configurable via Editor.configure [jgraph/drawio-desktop#1430]
+- Update resources submodule with 9 unused resource keys removed
+- fix: respect hidden tags in PDF export and printing [jgraph/drawio#3183]
+- feat: populate tags URL/config param with current hidden tags state
+- feat: streamline hidden tags handling across export and UI components
+- feat: add root/layer metadata and type attribute to svgdata plugin SVG export [jgraph/drawio#5527]
+- fix: always prevent default scroll on spacebar when activating panning [jgraph/drawio/issues/5524]
+- fix: use this.format instead of undefined self.format in wrapSvgBlockElements
+- fix: replace transform with zoom for improved print preview scaling
+- feat: add enableLocalFonts config flag for desktop font scanning [jgraph/drawio-desktop#2371]
+- fix: resolve %pagenumber% for each page during all-pages PDF export [jgraph/drawio-desktop#2376]
+- Refactor export dialog layout and styles
+- feat: extract embedded XML from PDF files in CLI export [jgraph/drawio-desktop#2160]
+- fix: apply --width/--height to PDF export in CLI [jgraph/drawio-desktop#2162]
+- feat: add contractParent and groupPadding styles for auto-shrinking groups [jgraph/drawio#618]
+- Restyle embed dialogs and add auto-height for CustomDialog
+- Move dialog style guide to separate file and add auto-height to print dialog
+- Restyle config-editor dialog to match main app theme
+- fix: avoid inline toolbar overlap with edge labels and child elements
+- Remove agent and version attributes from mxfile
+- fix: disable MathJax inline line breaking for edge labels [jgraph/drawio#5514]
+- Add fixedHeader style for swimlane shapes
+
+24-MAR-2026: 29.6.6
+
+- Enhances tab activation and scrolling behavior in the page tab container
+- Threads done callback through openFiles/openFileHandle/openLocalFile
+- Remove launch configuration file for development servers
+- Sanitizes invalid VSDX property names for best-effort import
+- Add clipboard actions to generate dialog [jgraph/drawio#5507]
+- Update subproject commit reference in resources
+- Add smooth scrolling to tab on click in createTab function
+- Update chat window dimensions in openGenerateDialog function
+- Allow docked windows to be resized
+- Update clipboard copy label in ChatWindow dialog
+- Adds animated gif export to atlas.min.js
+- Add insert diagram from clipboard option in generate dialog
+- Improve generate dialog dropdown labels for AI options
+- Fixes encoding for connect attachments comments
+
+23-MAR-2026: 29.6.5
+
+- Corrects dashboard path
+- Avoid InlineToolbar overlapping edge segments
+- Remove embedded XML from images copied to clipboard
+- Add showLinkIcons and showTooltipIcons support to GraphViewer
+- Fix word wrapping mismatch in autosizeText in-place editor
+- Fix MathJax path in embed dev mode
+- Fix fill patterns to scale correctly with diagram zoom level
+- Fix touch input on Android tablets using Chrome desktop site mode
+- Fixes wrong SVG scaling in desktop PNG export [drawio-desktop#1954]
+- Adds intersectionSelect configuration switch [drawio#5508]
+- Fixes undo for initial fill style change (eg. from auto to hatch)
+- Fixes Cmd+, for Chrome settings on macOS
+- Fixes fill pattern offset shifting on zoom and window resize
+- Add exportProtocol and diffSync options to JSON embed protocol
+- Adds configurable shape picker via Editor.configure() [jgraph/drawio#1812,jgraph/drawio#1197,jgraph/drawio#4130,jgraph/drawio#3783]
+- Marks imported files with updates page links as dirty [DID-17660]
+- Opens draw.io/VSDX files in same window when dropped on blank file
+
 18-MAR-2026: 29.6.4
 
 - Tidies changelog

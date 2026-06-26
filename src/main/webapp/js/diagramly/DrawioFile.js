@@ -181,7 +181,7 @@ DrawioFile.prototype.getShadowPages = function()
 {
 	if (this.shadowPages == null)
 	{
-		this.shadowPages = this.ui.getPagesForXml(this.initialData);
+		this.shadowPages = this.ui.getPagesForXml(this.initialData, true);
 
 		if (this.shadowVars === undefined)
 		{
@@ -493,7 +493,7 @@ DrawioFile.prototype.mergeFile = function(file, success, error, diffShadow, imme
 					this.inConflictState = true;
 					this.invalidChecksum = true;
 					this.descriptorChanged();
-					
+
 					if (error != null)
 					{
 						error(e);
@@ -501,11 +501,14 @@ DrawioFile.prototype.mergeFile = function(file, success, error, diffShadow, imme
 
 					try
 					{
-						if (reportError)
+						// InvalidCharacterError from atob is corrupt patch data,
+						// not actionable (eg. external tools modifying files)
+						if (reportError && !(e instanceof DOMException &&
+							e.name == 'InvalidCharacterError'))
 						{
 							var user = this.getCurrentUser();
 							var uid = (user != null) ? user.id : 'unknown';
-							
+
 							EditorUi.logError('Error in mergeFile', null,
 								this.getMode() + '.' + this.getId(),
 								uid, e);
@@ -1656,6 +1659,85 @@ DrawioFile.prototype.getRevisions = function(success, error)
 };
 
 /**
+ * Returns a prior known-good version of this file for best-effort recovery (or
+ * null) via the success handler. The default walks the revision history newest
+ * first, skipping the current head (the content that just failed to load), and
+ * returns the most recent revision whose XML parses. Bounded to a few probes to
+ * limit API calls. Files with another source (eg. the desktop .bkp backup) or
+ * without revision history may override this. Never calls error - a listing or
+ * fetch failure is treated as "no recovery version".
+ */
+DrawioFile.prototype.getRecoveryVersion = function(success, error)
+{
+	if (!this.isRevisionHistorySupported())
+	{
+		success(null);
+		return;
+	}
+
+	this.getRevisions(mxUtils.bind(this, function(revs)
+	{
+		// revs are ordered oldest -> newest; revs[length - 1] is the current
+		// head, so the most recent prior revision is at length - 2
+		if (revs == null || revs.length < 2)
+		{
+			success(null);
+			return;
+		}
+
+		var maxProbe = 5;
+		var index = revs.length - 2;
+		var end = Math.max(0, index - maxProbe + 1);
+
+		var tryNext = mxUtils.bind(this, function()
+		{
+			if (index < end)
+			{
+				EditorUi.debug('DrawioFile.getRecoveryVersion', [this],
+					'no valid revision found in', (revs.length - 1 - end), 'probed');
+				success(null);
+				return;
+			}
+
+			var item = revs[index--];
+
+			if (item == null || typeof item.getXml !== 'function')
+			{
+				tryNext();
+				return;
+			}
+
+			item.getXml(mxUtils.bind(this, function(xml)
+			{
+				if (this.ui.isFileDataLoadable(xml))
+				{
+					var dateStr = this.ui.formatRecoveryDate(item.modifiedDate);
+
+					success({type: 'version',
+						label: (dateStr != null) ? mxResources.get('recoverVersionFrom', [dateStr]) :
+							mxResources.get('recoverPreviousVersion'),
+						description: mxResources.get('recoveryVersionDesc'),
+						data: xml, date: item.modifiedDate, lossy: false});
+				}
+				else
+				{
+					tryNext();
+				}
+			}), mxUtils.bind(this, function()
+			{
+				tryNext();
+			}));
+		});
+
+		tryNext();
+	}), mxUtils.bind(this, function()
+	{
+		// Revision listing failed - no recovery version available
+		success(null);
+	}));
+};
+
+/**
  * Hook for subclassers to get the latest descriptor of this file
  * and return it in the success handler.
  */
@@ -1928,6 +2010,17 @@ DrawioFile.prototype.saveDraft = function(data)
 {
 	try
 	{
+		data = (data != null) ? data : this.ui.getFileData();
+
+		// Empty diagrams are useless as drafts — drop any existing one
+		// instead of writing an empty record, so the post-restart prompt
+		// doesn't surface drafts that contain nothing to recover.
+		if (this.ui.isDiagramDataEmpty(data))
+		{
+			this.removeDraft();
+			return;
+		}
+
 		if (this.draftId == null)
 		{
 			if (this.usedDraftId != null)
@@ -1939,17 +2032,17 @@ DrawioFile.prototype.saveDraft = function(data)
 				this.draftId = Editor.guid();
 			}
 		}
-		
+
 		var draft = {type: 'draft',
 			created: this.created,
 			modified: new Date().getTime(),
-			data: (data != null) ? data : this.ui.getFileData(),
+			data: data,
 			title: this.getTitle(),
 			fileObject: this.fileObject,
 			aliveCheck: this.ui.draftAliveCheck};
 		this.ui.setDatabaseItem('.draft_' + this.draftId,
 			JSON.stringify(draft));
-		
+
 		EditorUi.debug('DrawioFile.saveDraft', [this],
 			'draftId', this.draftId, [draft]);
 	}
@@ -2657,7 +2750,8 @@ DrawioFile.prototype.fileSaved = function(savedData, lastDesc, success, error, t
 	{
 		this.inConflictState = false;
 		this.invalidChecksum = false;
-		pages = (pages != null) ? pages : this.ui.getPagesForXml(savedData);
+
+		pages = (pages != null) ? pages : this.ui.getPagesForXml(savedData, true);
 
 		try
 		{

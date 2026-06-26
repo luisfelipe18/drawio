@@ -154,6 +154,7 @@ OUTPUT FILES (in src/main/webapp/js/):
 				<file name="EditorUi.js" />
 				<file name="Sidebar.js" />
 				<file name="Graph.js" />
+				<file name="InlineToolbar.js" />
 				<file name="Format.js" />
 				<file name="Shapes.js" />
 				<file name="Actions.js" />
@@ -204,6 +205,7 @@ OUTPUT FILES (in src/main/webapp/js/):
 				<file name="Sidebar-FluidPower.js" />
 				<file name="Sidebar-GCP.js" />
 				<file name="Sidebar-GCP2.js" />
+				<file name="Sidebar-GCP3.js" />
 				<file name="Sidebar-GCPIcons.js" />
 				<file name="Sidebar-Gmdl.js" />
 				<file name="Sidebar-IBM.js" />
@@ -389,6 +391,7 @@ OUTPUT FILES (in src/main/webapp/js/):
 				<file name="Dialogs.js" />
 				<file name="Editor.js" />
 				<file name="EditorUi.js" />
+				<file name="ConfigEditor.js" />
 				<file name="DiffSync.js" />
 				<file name="Settings.js" />
 				<file name="DrawioFilePolling.js" />
@@ -408,8 +411,13 @@ OUTPUT FILES (in src/main/webapp/js/):
 			<sources dir="${basedir}">
 				<file name="Graph-Stylesheet.js" />
 			</sources>
+
+			<sources dir="${war.dir}/js/diagramly/gif">
+				<file name="GifEncoder.js" />
+				<file name="AnimatedExport.js" />
+			</sources>
 		</jscomp>
-			
+
 		<!-- Build base.min.js (intermediate bundle) -->
 		<concat destfile="${basedir}/base.min.js" fixlastline="yes" append="no">
 			<filelist dir="${war.dir}/js/spin" files="spin.min.js"/>
@@ -435,9 +443,6 @@ OUTPUT FILES (in src/main/webapp/js/):
 			<sources dir="${war.dir}/js/diagramly/emf">
 				<file name="emf-svg.js" />
 			</sources>
-			<sources dir="${war.dir}/js/mermaid">
-				<file name="mermaid2drawio.js" />
-			</sources>
 			<sources dir="${war.dir}/js/diagramly/graphml">
 				<file name="mxGraphMlCodec.js" />
 			</sources>
@@ -457,14 +462,25 @@ OUTPUT FILES (in src/main/webapp/js/):
 			<filelist dir="${basedir}" files=".tmp3.js"/>
     	</concat>
 		<delete file="${basedir}/.tmp3.js"/>
+		<jscomp compilationLevel="simple" debug="false" forceRecompile="true" output="${basedir}/.tmpelk.js">
+			<sources dir="${war.dir}/js/diagramly">
+				<file name="ElkLayout.js" />
+			</sources>
+		</jscomp>
 
-		<!-- Append vendor libraries to extensions.min.js -->
+		<!-- Append vendor libraries to extensions.min.js.
+		     drawio-elk must come before drawio-mermaid so that window.ELK is
+		     defined when mermaid's layout bridge reads globalThis.ELK, and
+		     before the ElkLayout editor statics so they attach immediately. -->
 		<concat destfile="${war.dir}/js/extensions.min.js" fixlastline="yes" append="yes">
 			<fileset file="${war.dir}/js/jszip/jszip.min.js"/>
-			<fileset file="${war.dir}/js/mermaid/mermaid.min.js"/>
+			<fileset file="${war.dir}/js/elk/drawio-elk.min.js"/>
+			<filelist dir="${basedir}" files=".tmpelk.js"/>
+			<fileset file="${war.dir}/js/mermaid/drawio-mermaid.min.js"/>
 			<fileset file="${war.dir}/js/orgchart.min.js"/>
     	</concat>
-		
+		<delete file="${basedir}/.tmpelk.js"/>
+
 		<delete file="${basedir}/.tmp1.js"/>
 		
 		<!-- Step 10: Compile full app with cloud integrations -->
@@ -482,6 +498,7 @@ OUTPUT FILES (in src/main/webapp/js/):
 				<file name="Dialogs.js" />
 				<file name="Editor.js" />
 				<file name="EditorUi.js" />
+				<file name="ConfigEditor.js" />
 				<file name="DiffSync.js" />
 				<file name="Settings.js" />
 				<file name="DrawioFilePolling.js" />

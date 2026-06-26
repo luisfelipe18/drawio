@@ -50,6 +50,15 @@ mxUtils.extend(mxSwimlane, mxShape);
 mxSwimlane.prototype.imageSize = 16;
 
 /**
+ * Variable: fixedHeaderDefault
+ *
+ * Default value for the fixedHeader style. If true, the swimlane header is
+ * always rendered even when startSize is 0. Subclasses may set this to false
+ * so that startSize of 0 falls back to non-swimlane rendering. Default is true.
+ */
+mxSwimlane.prototype.fixedHeaderDefault = true;
+
+/**
  * Function: apply
  * 
  * Extends mxShape to update the swimlane styles.
@@ -94,18 +103,38 @@ mxSwimlane.prototype.getTitleSize = function()
 };
 
 /**
+ * Function: getFooterSize
+ *
+ * Returns the size of the footer, the filled and bordered region painted at the
+ * end of the swimlane opposite the title. Default is 0 (no footer).
+ */
+mxSwimlane.prototype.getFooterSize = function()
+{
+	return Math.max(0, mxUtils.getValue(this.style,
+		mxConstants.STYLE_FOOTER_SIZE, 0));
+};
+
+/**
  * Function: getLabelBounds
  * 
  * Returns the bounding box for the label.
  */
 mxSwimlane.prototype.getLabelBounds = function(rect)
 {
+	var start = this.getTitleSize();
+	var fixedHeader = mxUtils.getValue(this.style,
+		mxConstants.STYLE_FIXED_HEADER, this.fixedHeaderDefault);
+
+	if (start == 0 && !fixedHeader)
+	{
+		return mxShape.prototype.getLabelBounds.apply(this, arguments);
+	}
+
 	var flipH = mxUtils.getValue(this.style, mxConstants.STYLE_FLIPH, 0) == 1;
 	var flipV = mxUtils.getValue(this.style, mxConstants.STYLE_FLIPV, 0) == 1;
-	var bounds = new mxRectangle(rect.x, rect.y, rect.width, rect.height);	
+	var bounds = new mxRectangle(rect.x, rect.y, rect.width, rect.height);
 	var horizontal = this.isHorizontal();
-	var start = this.getTitleSize();
-	
+
 	// East is default
 	var shapeVertical = (this.direction == mxConstants.DIRECTION_NORTH ||
 			this.direction == mxConstants.DIRECTION_SOUTH);
@@ -204,6 +233,14 @@ mxSwimlane.prototype.paintVertexShape = function(c, x, y, w, h)
 	if (!this.outline)
 	{
 		var start = this.getTitleSize();
+		var fixedHeader = mxUtils.getValue(this.style,
+			mxConstants.STYLE_FIXED_HEADER, this.fixedHeaderDefault);
+
+		if (start == 0 && !fixedHeader)
+		{
+			return;
+		}
+
 		var r = 0;
 		
 		if (this.isHorizontal())
@@ -227,7 +264,9 @@ mxSwimlane.prototype.paintVertexShape = function(c, x, y, w, h)
 			r = Math.min(((this.isHorizontal()) ? h : w) - start, Math.min(start, r));
 			this.paintRoundedSwimlane(c, x, y, w, h, start, r);
 		}
-		
+
+		this.paintFooter(c, x, y, w, h, start, r);
+
 		var sep = mxUtils.getValue(this.style, mxConstants.STYLE_SEPARATORCOLOR, mxConstants.NONE);
 		this.paintSeparator(c, x, y, w, h, start, sep);
 
@@ -539,6 +578,105 @@ mxSwimlane.prototype.paintRoundedSwimlane = function(c, x, y, w, h, start, r)
 	if (line)
 	{
 		this.paintDivider(c, x, y, w, h, start, fill == mxConstants.NONE);
+	}
+};
+
+/**
+ * Function: paintFooter
+ *
+ * Paints the footer, a filled and bordered region at the end of the swimlane
+ * opposite the title. The footer follows the rounded corners of the swimlane
+ * when rounded (passing r = 0 for the non-rounded case), tracing the lane wall
+ * exactly even when the footer is shorter than the arc radius. Supports both
+ * horizontal and vertical orientations.
+ */
+mxSwimlane.prototype.paintFooter = function(c, x, y, w, h, start, r)
+{
+	var footer = this.getFooterSize();
+	var horizontal = this.isHorizontal();
+	var size = (horizontal) ? h : w;
+
+	// Keeps the footer within the body so it never overlaps the title
+	footer = Math.min(footer, size - start);
+
+	if (footer <= 0)
+	{
+		return;
+	}
+
+	var fill = this.fill;
+
+	// Reuses the title fill (the body may have switched to the lane fill) and
+	// disables the shadow so the inner border does not cast one onto the body
+	if (fill != null && fill != mxConstants.NONE)
+	{
+		c.setFillColor(fill);
+	}
+
+	c.setShadow(false);
+	c.begin();
+
+	if (horizontal)
+	{
+		var rr = Math.min(w / 2, r);
+
+		if (footer >= r)
+		{
+			// Divider clears the corners: straight sides plus the full rounding
+			c.moveTo(0, h - footer);
+			c.lineTo(0, h - r);
+			c.quadTo(0, h, rr, h);
+			c.lineTo(w - rr, h);
+			c.quadTo(w, h, w, h - r);
+			c.lineTo(w, h - footer);
+		}
+		else
+		{
+			// Divider falls inside the corners: trace the lane wall (radius r)
+			// from where its quadratic crosses y = h - footer (split at t)
+			var t = 1 - Math.sqrt(footer / r);
+			var px = rr * t * t;
+			var bx = rr * t;
+			c.moveTo(px, h - footer);
+			c.quadTo(bx, h, rr, h);
+			c.lineTo(w - rr, h);
+			c.quadTo(w - bx, h, w - px, h - footer);
+		}
+	}
+	else
+	{
+		var rr = Math.min(h / 2, r);
+
+		if (footer >= r)
+		{
+			c.moveTo(w - footer, 0);
+			c.lineTo(w - r, 0);
+			c.quadTo(w, 0, w, rr);
+			c.lineTo(w, h - rr);
+			c.quadTo(w, h, w - r, h);
+			c.lineTo(w - footer, h);
+		}
+		else
+		{
+			var t = 1 - Math.sqrt(footer / r);
+			var py = rr * t * t;
+			var by = rr * t;
+			c.moveTo(w - footer, py);
+			c.quadTo(w, by, w, rr);
+			c.lineTo(w, h - rr);
+			c.quadTo(w, h - by, w - footer, h - py);
+		}
+	}
+
+	c.close();
+
+	if (fill != null && fill != mxConstants.NONE)
+	{
+		c.fillAndStroke();
+	}
+	else
+	{
+		c.stroke();
 	}
 };
 
